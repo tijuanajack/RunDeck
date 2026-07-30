@@ -4,6 +4,7 @@
 *.zip
 firmware/vendor/
 firmware/build*/
+firmware/backups/
 firmware/RunDeck/esp_lcd_*.c
 firmware/RunDeck/esp_lcd_*.h
 firmware/RunDeck/board/vendor/
