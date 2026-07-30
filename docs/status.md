@@ -10,6 +10,11 @@ Last verified: 2026-07-30.
   hash-verified but left the panel black immediately. The untouched vendor
   ESP-IDF LVGL test did the same. This rejects RunDeck source, touch, BLE,
   UI code, and the original cable as the root cause.
+- The vendor `10_FactoryProgram`, built with ESP-IDF 5.5.2, matches the
+  factory image's 16 MB partition table and boot/app headers. It lights the
+  panel after upload reset but still black-screens after a true USB cold boot.
+  The next firmware test must capture its serial cold-boot log; the board has
+  been restored to factory afterward.
 - The factory image bootloader and partition table differ from the Arduino
   output. Do **not** flash another Arduino build as a normal development step.
   The next firmware task is to reproduce the factory/vendor boot configuration

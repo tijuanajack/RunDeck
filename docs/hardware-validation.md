@@ -46,6 +46,14 @@ at about 14%. With the replacement cable and the ESP32-S3 ROM loader
 (`--no-stub`, 115200 baud), the complete factory image was restored and hash
 verified.
 
+The factory image identifies as ESP-IDF 5.5.2 and contains the vendor
+`10_FactoryProgram` modules. Rebuilding that project under ESP-IDF 5.5.2
+produced an exact matching partition table plus matching bootloader and app
+image header/segment layouts. It displayed after upload reset but still failed
+after a true USB cold boot. The remaining investigation must capture serial
+logs from that cold boot and compare runtime initialization behavior; do not
+replace it with another speculative display build.
+
 ## Required procedure
 
 1. Fetch the vendor archive using `firmware/tools/fetch-waveshare-bsp.sh`.

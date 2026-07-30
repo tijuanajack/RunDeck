@@ -24,10 +24,11 @@ planned work.
   casually; a prior bad update caused a black-screen recovery event.
 - Critical 2026-07-30 finding: with a verified data cable, Waveshare's
   untouched **Arduino** LVGL demo uploads and hashes successfully but leaves
-  the panel black; the vendor ESP-IDF LVGL demo did the same. Do not use either
-  build path for routine flashing until the factory boot/flash configuration
-  is matched and three cold boots pass. The factory image uses a different
-  bootloader and partition table.
+  the panel black; the vendor ESP-IDF LVGL demo did the same. A source and
+  header-matched ESP-IDF 5.5.2 `10_FactoryProgram` build lights the panel after
+  upload reset but still fails after a true USB cold boot. Do not flash another
+  candidate until serial cold-boot diagnostics identify the remaining runtime
+  initialization mismatch. The factory image remains the recovery baseline.
 - Use a known-good direct USB data cable. A failing cable previously dropped
   full-image writes at about 14%; the ROM-loader factory restore succeeded
   after the cable was replaced.

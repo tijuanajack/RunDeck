@@ -37,8 +37,9 @@ blindly flash another firmware build.
 
 5. Do **not** flash the Arduino RunDeck build yet: on this board the generic
    vendor Arduino and ESP-IDF images both hash-verify yet leave the panel
-   black. First extract and reproduce the factory boot, partition, display,
-   and power configuration.
+   black. A header-matched FactoryProgram build also fails after a true cold
+   boot. Capture serial cold-boot logs and compare runtime initialization
+   before attempting another firmware candidate.
 
 6. Only after that configuration passes three cold boots, compile and flash
    the current source to the same confirmed Espressif port.
