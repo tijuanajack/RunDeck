@@ -48,6 +48,12 @@ Last verified: 2026-07-30.
   notification.
 - On 2026-07-30, a real walk verified Android GPS pace, distance, and elapsed
   time agree with the values delivered to the RunDeck display.
+- Live BLE polish checkpoint: Android now exposes an explicit phone-to-RunDeck
+  bridge status, unit tests cover the status labels, and firmware renders
+  absent HR as `--` / `GARMIN STRAP OFF` instead of `0 BPM` or a simulated
+  in-zone value. The firmware build and flash were hash-verified on
+  2026-07-30; the Android APK built successfully but was not installed because
+  no phone was visible to ADB at that moment.
 - The selected V1 Long Run target is 8:50–9:20 /mi. Android derives
   `ON TARGET`, `EASE OFF`, `PICK IT UP`, or `GPS WEAK` and sends that state to
   the display. Active-run distance, elapsed time, and pace are checkpointed
@@ -64,9 +70,10 @@ Last verified: 2026-07-30.
 - The device currently receives live metrics only. The versioned run-state,
   media, notification, settings, and heartbeat characteristics exist but their
   full CBOR/acknowledgement contracts are not implemented end-to-end.
-- The heart-rate display is simulated/unavailable in live phone-GPS runs.
-  Garmin HRM-Dual direct mode, concurrent central/peripheral soak testing, and
-  phone-forwarded HR remain future work.
+- Heart rate remains optional. Live phone-GPS runs display the Garmin strap as
+  off/unavailable until an actual HR source is connected. Garmin HRM-Dual
+  direct mode, concurrent central/peripheral soak testing, and phone-forwarded
+  HR remain future work.
 - Media control, notification allowlisting/dismissal, Open-Meteo, touch lock,
   brightness/power work, and real-run outdoor validation remain future work.
 - The scripted flash helper deliberately refuses to choose between multiple
@@ -75,16 +82,16 @@ Last verified: 2026-07-30.
 
 ## Next implementation order
 
-1. Re-run the full-UI cold-boot gate three times; restore factory
-   immediately on any failed cold boot.
-2. Add touch using locked FT5x06 1.1.0-compatible dependencies, then validate
-   cold boot again before reintroducing BLE and RunDeck rendering.
-3. Finish V1 run-state protocol: CBOR preset/run-state characteristic,
+1. Continue BLE/live phone metrics polish and reconnect visibility; re-run the
+   full-UI cold-boot gate three times when the user can physically test it.
+   Restore factory immediately on any failed cold boot.
+2. Finish V1 run-state protocol: CBOR preset/run-state characteristic,
    acknowledgement/event handling, and resume/discard checkpoint UI.
-4. Add phone-forwarded HR and target/combined pace-HR status rules, then
-   evaluate direct Garmin HRM-Dual only behind the BLE-concurrency soak gate.
-5. Add MediaSession metadata/actions and the Music display screen bridge.
-6. Add notification allowlist, sanitization, modal payloads, and permitted
-   dismissal acknowledgements.
-7. Add weather freshness, settings, touch lock/brightness, resilience tests,
-   and outdoor/power validation.
+3. Add MediaSession metadata/actions and the Music display screen bridge.
+4. Add notification allowlist, sanitization, modal payloads, and permitted
+   dismissal acknowledgements; then add weather freshness, settings, touch
+   lock/brightness, resilience tests, and outdoor/power validation.
+5. Add optional HR: phone-forwarded HR and target/combined pace-HR status
+   rules first, then evaluate direct Garmin HRM-Dual only behind the
+   BLE-concurrency soak gate. The strap must be treated as absent when not
+   worn/connected.

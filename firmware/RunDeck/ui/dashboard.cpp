@@ -262,8 +262,16 @@ void Dashboard::updateDashboard() {
   lv_obj_set_style_text_color(paceTarget_, status[0] == 'O' ? kLime : (status[0] == 'G' ? kMuted : kRed), 0);
   snprintf(value, sizeof(value), "%.2f", state_.distanceMiles); lv_label_set_text(distance_, value);
   snprintf(value, sizeof(value), "%02lu:%02lu", state_.elapsedSeconds / 60, state_.elapsedSeconds % 60); lv_label_set_text(elapsed_, value);
-  snprintf(value, sizeof(value), "%u", state_.heartRateBpm); lv_label_set_text(hr_, value);
-  lv_label_set_text(hrTarget_, "TARGET 135-150 / IN ZONE");
+  const bool heartRateLive = state_.heartRate.state == SourceState::Connected && state_.heartRateBpm > 0;
+  if (heartRateLive) {
+    snprintf(value, sizeof(value), "%u", state_.heartRateBpm); lv_label_set_text(hr_, value);
+    lv_label_set_text(hrTarget_, "TARGET 135-150 / IN ZONE");
+  } else {
+    lv_label_set_text(hr_, "--");
+    lv_label_set_text(hrTarget_, "GARMIN STRAP OFF");
+  }
+  lv_obj_set_style_text_color(hr_, heartRateLive ? kWhite : kMuted, 0);
+  lv_obj_set_style_text_color(hrTarget_, heartRateLive ? kLime : kMuted, 0);
   snprintf(value, sizeof(value), "%s\n%s", title, artist); lv_label_set_text(media_, value);
   if (notification_ && state_.notificationVisible && !notificationDismissed_) lv_obj_clear_flag(notification_, LV_OBJ_FLAG_HIDDEN);
   if (notification_ && !state_.notificationVisible) {

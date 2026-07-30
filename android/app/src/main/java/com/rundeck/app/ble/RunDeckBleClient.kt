@@ -26,6 +26,23 @@ import kotlin.math.roundToInt
 
 data class DiscoveredRunDeck(val name: String, val address: String, val rssi: Int, internal val device: BluetoothDevice)
 
+data class LiveBridgeStatus(
+    val connected: Boolean = false,
+    val streamingRun: Boolean = false,
+    val lastSequence: Int? = null,
+    val lastAttemptMs: Long = 0,
+    val lastWriteConfirmedMs: Long = 0,
+    val lastError: String? = null,
+) {
+    fun label(nowMs: Long = SystemClock.elapsedRealtime()): String = when {
+        lastError != null -> lastError
+        !connected -> "DISPLAY OFFLINE"
+        streamingRun && lastWriteConfirmedMs > 0 && nowMs - lastWriteConfirmedMs <= 3_000 -> "PHONE LIVE → RUNDECK"
+        streamingRun && lastAttemptMs > 0 -> "SENDING TO RUNDECK…"
+        else -> "DISPLAY CONNECTED"
+    }
+}
+
 sealed interface DeviceConnection {
     data object Idle : DeviceConnection
     data object Scanning : DeviceConnection
@@ -53,6 +70,8 @@ class RunDeckBleClient(context: Context) {
     val devices: StateFlow<List<DiscoveredRunDeck>> = _devices.asStateFlow()
     private val _connection = MutableStateFlow<DeviceConnection>(DeviceConnection.Idle)
     val connection: StateFlow<DeviceConnection> = _connection.asStateFlow()
+    private val _bridge = MutableStateFlow(LiveBridgeStatus())
+    val bridge: StateFlow<LiveBridgeStatus> = _bridge.asStateFlow()
 
     private val reconnectRunnable = Runnable { reconnectRememberedDevice() }
 
@@ -96,10 +115,22 @@ class RunDeckBleClient(context: Context) {
             val service: BluetoothGattService? = gatt.getService(RunDeckProtocol.SERVICE_UUID)
             liveMetrics = service?.getCharacteristic(RunDeckProtocol.LIVE_METRICS_UUID)
             _connection.value = if (status == BluetoothGatt.GATT_SUCCESS && liveMetrics != null) {
+                _bridge.value = _bridge.value.copy(connected = true, lastError = null)
                 startMetricsStream()
                 DeviceConnection.Ready(gatt.device.name ?: "RunDeck")
             } else {
+                _bridge.value = _bridge.value.copy(connected = false, streamingRun = false, lastError = "PROTOCOL NOT FOUND")
                 DeviceConnection.Error("RunDeck protocol service was not found")
+            }
+        }
+
+        override fun onCharacteristicWrite(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) {
+            if (characteristic.uuid != RunDeckProtocol.LIVE_METRICS_UUID) return
+            val now = SystemClock.elapsedRealtime()
+            _bridge.value = if (status == BluetoothGatt.GATT_SUCCESS) {
+                _bridge.value.copy(connected = true, lastWriteConfirmedMs = now, lastError = null)
+            } else {
+                _bridge.value.copy(lastError = "METRIC WRITE FAILED ($status)")
             }
         }
     }
@@ -142,6 +173,7 @@ class RunDeckBleClient(context: Context) {
     /** Publishes GPS state as the same compact packet the display already understands. */
     fun publishRunState(state: RunUiState) {
         currentRunState = state
+        _bridge.value = _bridge.value.copy(streamingRun = state.active)
         if (state.active) sendRunMetrics(state)
     }
 
@@ -158,22 +190,39 @@ class RunDeckBleClient(context: Context) {
                 movingSeconds = state.elapsedSeconds,
                 speedCentimetersPerSecond = 0,
                 temperatureDeciF = 0,
-                forwardedHeartRate = 0,
+                forwardedHeartRate = state.heartRateBpm ?: 0,
             ),
         )
     }
 
     @SuppressLint("MissingPermission")
     private fun writeMetrics(sequence: Int, sourceMs: Long, metrics: LiveMetrics) {
-        val characteristic = liveMetrics ?: return
+        val characteristic = liveMetrics ?: run {
+            _bridge.value = _bridge.value.copy(connected = false, lastError = "DISPLAY OFFLINE")
+            return
+        }
         val payload = RunDeckProtocol.encodeLiveMetrics(sequence, sourceMs, metrics)
-        val target = gatt ?: return
+        val target = gatt ?: run {
+            _bridge.value = _bridge.value.copy(connected = false, lastError = "DISPLAY OFFLINE")
+            return
+        }
+        _bridge.value = _bridge.value.copy(
+            connected = true,
+            streamingRun = currentRunState?.active == true,
+            lastSequence = sequence,
+            lastAttemptMs = SystemClock.elapsedRealtime(),
+            lastError = null,
+        )
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            target.writeCharacteristic(characteristic, payload, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT)
+            val status = target.writeCharacteristic(characteristic, payload, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT)
+            if (status != 0) _bridge.value = _bridge.value.copy(lastError = "METRIC QUEUE FAILED ($status)")
         } else {
             characteristic.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
             characteristic.value = payload
-            @Suppress("DEPRECATION") target.writeCharacteristic(characteristic)
+            @Suppress("DEPRECATION")
+            if (!target.writeCharacteristic(characteristic)) {
+                _bridge.value = _bridge.value.copy(lastError = "METRIC QUEUE FAILED")
+            }
         }
     }
 
@@ -235,6 +284,7 @@ class RunDeckBleClient(context: Context) {
         demoHandler.removeCallbacksAndMessages(null)
         gatt = null
         closedGatt.close()
+        _bridge.value = _bridge.value.copy(connected = false, streamingRun = false, lastError = reason.uppercase())
         if (reconnectEnabled && rememberedAddress != null && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
             val delayMs = 1_000L shl reconnectAttempts.coerceAtMost(3)
             reconnectAttempts += 1

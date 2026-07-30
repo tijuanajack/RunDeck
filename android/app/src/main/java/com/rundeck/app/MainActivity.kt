@@ -45,6 +45,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rundeck.app.ble.DeviceConnection
 import com.rundeck.app.ble.DiscoveredRunDeck
+import com.rundeck.app.ble.LiveBridgeStatus
 import com.rundeck.app.ble.RunDeckBleClient
 import com.rundeck.app.run.RunSession
 import com.rundeck.app.run.RunTrackingService
@@ -64,6 +65,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     private val bleClient = RunDeckBleClient(application)
     val devices = bleClient.devices
     val connection = bleClient.connection
+    val bridge = bleClient.bridge
     init {
         viewModelScope.launch {
             RunSession.state.collectLatest(bleClient::publishRunState)
@@ -79,6 +81,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
 private fun RunDeckApp(viewModel: DeviceViewModel = viewModel()) {
     val devices by viewModel.devices.collectAsState()
     val connection by viewModel.connection.collectAsState()
+    val bridge by viewModel.bridge.collectAsState()
     val run by RunSession.state.collectAsState()
     var showRunSetup by remember { mutableStateOf(false) }
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -112,7 +115,7 @@ private fun RunDeckApp(viewModel: DeviceViewModel = viewModel()) {
     MaterialTheme {
         Surface(color = Black, modifier = Modifier.fillMaxSize()) {
             when {
-                run.active -> ActiveRunScreen(run, onStop = {
+                run.active -> ActiveRunScreen(run, bridge, onStop = {
                     context.startService(Intent(context, RunTrackingService::class.java).setAction(RunTrackingService.ACTION_STOP))
                 })
                 showRunSetup -> RunSetupScreen(
@@ -174,11 +177,13 @@ private fun RunSetupScreen(connected: Boolean, onStart: () -> Unit, onBack: () -
 }
 
 @Composable
-private fun ActiveRunScreen(state: com.rundeck.app.run.RunUiState, onStop: () -> Unit) = ScreenColumn {
+private fun ActiveRunScreen(state: com.rundeck.app.run.RunUiState, bridge: LiveBridgeStatus, onStop: () -> Unit) = ScreenColumn {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Text("RUNDECK", color = Lime, fontWeight = FontWeight.Black, letterSpacing = 3.sp)
-        Text(state.gpsStatus, color = Cyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+        Text(bridge.label(), color = if (bridge.lastError == null) Cyan else Amber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
     }
+    Spacer(Modifier.height(8.dp))
+    Text(state.gpsStatus, color = Muted, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.align(Alignment.End))
     Spacer(Modifier.height(22.dp))
     Text("PACE", color = White, fontSize = 22.sp, letterSpacing = 3.sp, modifier = Modifier.align(Alignment.CenterHorizontally))
     Text(RunTrackingService.formatPace(state.paceSecondsPerMile), color = White, fontSize = 58.sp, fontWeight = FontWeight.Black, modifier = Modifier.align(Alignment.CenterHorizontally))
@@ -186,6 +191,7 @@ private fun ActiveRunScreen(state: com.rundeck.app.run.RunUiState, onStop: () ->
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
         Metric("DISTANCE", "%.2f MI".format(state.distanceMeters / 1609.344))
         Metric("ELAPSED", "%02d:%02d".format(state.elapsedSeconds / 60, state.elapsedSeconds % 60))
+        Metric("HR STRAP", state.heartRateBpm?.let { "$it BPM" } ?: "OFF")
     }
     Spacer(Modifier.height(20.dp))
     val targetStatus = LongRunTarget.status(state.paceSecondsPerMile)

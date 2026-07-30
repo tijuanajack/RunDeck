@@ -27,6 +27,8 @@ data class RunUiState(
     val distanceMeters: Double = 0.0,
     val paceSecondsPerMile: Double? = null,
     val gpsStatus: String = "GPS READY",
+    val heartRateBpm: Int? = null,
+    val heartRateStatus: String = "GARMIN STRAP OFF",
 )
 
 /** Process-local live state. DataStore checkpoints are the next persistence increment. */

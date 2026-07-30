@@ -103,6 +103,9 @@ planned work.
 - Current verified path: Android foreground `LocationManager` service →
   `RunSession` flow → `RunDeckBleClient` live-metrics write at 1 Hz → ESP32
   NimBLE server → immutable firmware `DisplayState` → LVGL dashboard.
+- BLE/live-metrics polish is proceeding before protocol/media/notification/HR
+  work. Android exposes a live bridge status; absent Garmin HR must render as
+  unavailable (`--` / `GARMIN STRAP OFF`), never as a fake or zero BPM value.
 - Live metrics are v1, little-endian, 33 bytes total. Preserve validation,
   sequence and freshness protections in `firmware/RunDeck/ble/rundeck_ble.cpp`
   and `android/app/src/main/java/com/rundeck/app/ble/RunDeckProtocol.kt`.
@@ -126,8 +129,12 @@ planned work.
 
 ## Roadmap boundaries
 
-Implement next: full run-state/preset CBOR and acknowledgements, resume/discard
-checkpoint UI, phone-forwarded HR, then direct-HR reliability testing. Media,
-notifications, weather, touch lock, brightness, and outdoor/power work follow.
+Implement in this user-selected order: BLE/live phone metrics polish; full
+run-state/preset CBOR and acknowledgements plus resume/discard checkpoint UI;
+MediaSession metadata/actions and Music bridge; notification/weather/settings/
+touch-lock/brightness/resilience work; optional HR last. For HR, add
+phone-forwarded support before direct Garmin HRM-Dual, and treat the strap as
+absent whenever it is not worn/connected. Direct-HR still requires the
+concurrent BLE role soak gate.
 Do not add maps, ski mode, Bowline, cloud/Garmin integrations, iOS, HRV,
 structured workouts, or voice reply to V1.
