@@ -1,6 +1,7 @@
 # RunDeck BLE protocol v1
 
-Primary service UUID: `7b2e0000-6d1f-4a91-8a5f-6c796a25a000`.
+Primary service UUID: `7b2e0000-6d1f-4a91-8a5f-6c796a25a000`. Characteristics
+replace the first group with `7b2e0001` through `7b2e0007` respectively.
 
 | Suffix | Direction | Encoding | Cadence |
 | --- | --- | --- |
@@ -12,7 +13,7 @@ Primary service UUID: `7b2e0000-6d1f-4a91-8a5f-6c796a25a000`.
 | `0006` configuration | bidirectional | CBOR | change |
 | `0007` heartbeat/clock | bidirectional | binary | 10 s |
 
-All binary frames begin with `version:u8, type:u8, sequence:u16,
+All binary frames use little-endian integers and begin with `version:u8, type:u8, sequence:u16,
 source_monotonic_ms:u32, payload_length:u16`. Receivers reject versions other
 than `1`, lengths beyond the characteristic limit, non-monotonic sequences,
 and values older than the message-specific freshness window.
