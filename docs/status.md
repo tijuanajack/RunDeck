@@ -21,12 +21,14 @@ Last verified: 2026-07-30.
   history confirms that FT5x06 `1.1.0` did not set this field, while
   `1.1.0~1` and `1.1.0~2` do. Treat the downloaded source as stale; floating
   component versions are prohibited for board bring-up.
-- `firmware/esp-idf-baseline/` is a newly built, display-only cold-boot gate.
-  It pins ESP-IDF 5.5.2 and `esp_lcd_sh8601 2.0.1~1`, preserves the factory
-  16 MB/QIO/80 MHz + octal PSRAM configuration and 9 MB factory partition,
-  and excludes touch, LVGL, BLE, Wi-Fi, and factory GPIO diagnostics. It has
-  **not** been flashed. Its sole success criterion is a solid green panel and
-  `DISPLAY_GATE_PASS` serial log on three USB cold boots.
+- `firmware/esp-idf-baseline/` uses ESP-IDF 5.5.2, `esp_lcd_sh8601 2.0.1~1`,
+  and LVGL 8.3.11 with the factory 16 MB/QIO/80 MHz + octal PSRAM and 9 MB
+  factory partition configuration. It excludes touch, BLE, Wi-Fi, and factory
+  GPIO diagnostics. It displays a stable full-screen green panel after an
+  upload reset, but **fails after the first true USB cold boot** (black panel,
+  no serial panic). This proves the remaining blocker is below the RunDeck
+  UI, touch, radio, and application layers. The board was restored to the full
+  factory image afterward, which cold-boots normally.
 - The factory image bootloader and partition table differ from the Arduino
   output. Do **not** flash another Arduino build as a normal development step.
   The next firmware task is to reproduce the factory/vendor boot configuration
@@ -76,16 +78,19 @@ Last verified: 2026-07-30.
 
 ## Next implementation order
 
-1. Flash and cold-boot-validate the display-only ESP-IDF baseline three times;
-   restore the factory image immediately on any failed cold boot.
-2. Add touch using locked FT5x06 1.1.0-compatible dependencies, then validate
-   cold boot again before reintroducing LVGL and RunDeck rendering.
-3. Finish V1 run-state protocol: CBOR preset/run-state characteristic,
+1. Identify and reproduce the factory-only AMOLED power/startup behavior,
+   including all early pin state and bootloader/application configuration,
+   before any further prototype flash.
+2. Re-run the display-only cold-boot gate three times; restore factory
+   immediately on any failed cold boot.
+3. Add touch using locked FT5x06 1.1.0-compatible dependencies, then validate
+   cold boot again before reintroducing BLE and RunDeck rendering.
+4. Finish V1 run-state protocol: CBOR preset/run-state characteristic,
    acknowledgement/event handling, and resume/discard checkpoint UI.
-4. Add phone-forwarded HR and target/combined pace-HR status rules, then
+5. Add phone-forwarded HR and target/combined pace-HR status rules, then
    evaluate direct Garmin HRM-Dual only behind the BLE-concurrency soak gate.
-5. Add MediaSession metadata/actions and the Music display screen bridge.
-6. Add notification allowlist, sanitization, modal payloads, and permitted
+6. Add MediaSession metadata/actions and the Music display screen bridge.
+7. Add notification allowlist, sanitization, modal payloads, and permitted
    dismissal acknowledgements.
-7. Add weather freshness, settings, touch lock/brightness, resilience tests,
+8. Add weather freshness, settings, touch lock/brightness, resilience tests,
    and outdoor/power validation.

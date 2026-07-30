@@ -31,9 +31,11 @@ planned work.
   initialization mismatch. The factory image remains the recovery baseline.
 - `firmware/esp-idf-baseline/` is the only approved next firmware candidate.
   It is deliberately display-only and pins ESP-IDF 5.5.2 with
-  `esp_lcd_sh8601 2.0.1~1`. It must display solid green and emit
-  `DISPLAY_GATE_PASS` on three USB cold boots before touch, LVGL, BLE, or the
-  RunDeck UI may be brought onto this path. It is built but not yet flashed.
+  `esp_lcd_sh8601 2.0.1~1` and LVGL 8.3.11. It displays a solid green panel
+  after an upload reset but black-screens on the first true USB cold boot,
+  without a serial panic. It is therefore **not approved for reflashing**.
+  The next investigation must focus on the factory-only early power/startup
+  behavior, not RunDeck, touch, BLE, or LVGL.
 - Use a known-good direct USB data cable. A failing cable previously dropped
   full-image writes at about 14%; the ROM-loader factory restore succeeded
   after the cable was replaced.
