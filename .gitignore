@@ -9,5 +9,6 @@ firmware/RunDeck/esp_lcd_*.c
 firmware/RunDeck/esp_lcd_*.h
 firmware/RunDeck/board/vendor/
 android/.gradle/
+android/.kotlin/
 android/**/build/
 local.properties
