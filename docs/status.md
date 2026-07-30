@@ -1,20 +1,56 @@
 # Implementation status
 
-## Implemented now
+Last verified: 2026-07-30.
 
-- Git workspace connected to authenticated HTTPS `origin/main`.
-- Monorepo baseline, hardware-validation procedure, BLE wire contract, and test
-  plan.
-- Standalone UI domain model and simulated data source; native-resolution LVGL
-  dashboard composition is ready to bind to the validated board adapter.
-- Android Compose project foundation and unit-tested pure pace calculator.
+## Working and verified
 
-## Hardware-gated next work
+- The repository is connected to authenticated HTTPS `origin` and development
+  is on `main`.
+- The Waveshare ESP32-S3-Touch-AMOLED-2.41 runs RunDeck at 600 × 450
+  landscape. Its black AMOLED UI, touch navigation, dashboard, Music, Stats,
+  and notification-overlay prototype are present in `firmware/RunDeck/`.
+- Firmware uses Arduino ESP32 core 3.0.7, LVGL 8.4.0, and NimBLE-Arduino 2.5.1.
+  The working board configuration uses the vendor SH8601 display path.
+- The device advertises the RunDeck BLE GATT service and Android can discover,
+  connect, disconnect, and reconnect to it.
+- The Android companion runs on API 36. It has BLE setup, a Run Setup screen,
+  a user-started foreground location service, and a persistent active-run
+  notification.
+- On 2026-07-30, a real walk verified Android GPS pace, distance, and elapsed
+  time agree with the values delivered to the RunDeck display.
+- The selected V1 Long Run target is 8:50–9:20 /mi. Android derives
+  `ON TARGET`, `EASE OFF`, `PICK IT UP`, or `GPS WEAK` and sends that state to
+  the display. Active-run distance, elapsed time, and pace are checkpointed
+  locally with DataStore; stopping the run clears the checkpoint.
+- A full 16 MB pre-RunDeck recovery image exists locally at
+  `firmware/backups/factory-before-rundeck.bin` and is intentionally ignored by
+  Git.
 
-- Copy/adapt the vendor panel and touch driver only after the untouched vendor
-  demo is flashed on the actual device. This is required because the vendor
-  archive currently calls the panel SH8601 while the original specification
-  calls it RM690B0.
-- Implement and test the real LVGL QSPI/touch adapter, swipe events, BLE GATT
-  server/client, HR client, Android BLE client, foreground service, and system
-  integrations on physical devices.
+## Current limitations (do not misrepresent as complete)
+
+- The Android app is still a compact single-module prototype. Hilt, Room,
+  feature modules, full preset editing, and active-run recovery/resume UI are
+  not implemented.
+- The device currently receives live metrics only. The versioned run-state,
+  media, notification, settings, and heartbeat characteristics exist but their
+  full CBOR/acknowledgement contracts are not implemented end-to-end.
+- The heart-rate display is simulated/unavailable in live phone-GPS runs.
+  Garmin HRM-Dual direct mode, concurrent central/peripheral soak testing, and
+  phone-forwarded HR remain future work.
+- Media control, notification allowlisting/dismissal, Open-Meteo, touch lock,
+  brightness/power work, and real-run outdoor validation remain future work.
+- The scripted flash helper deliberately refuses to choose between multiple
+  serial ports. When the phone is also attached, identify the Espressif USB
+  JTAG port via `udevadm` and use that explicit port.
+
+## Next implementation order
+
+1. Finish V1 run-state protocol: CBOR preset/run-state characteristic,
+   acknowledgement/event handling, and resume/discard checkpoint UI.
+2. Add phone-forwarded HR and target/combined pace-HR status rules, then
+   evaluate direct Garmin HRM-Dual only behind the BLE-concurrency soak gate.
+3. Add MediaSession metadata/actions and the Music display screen bridge.
+4. Add notification allowlist, sanitization, modal payloads, and permitted
+   dismissal acknowledgements.
+5. Add weather freshness, settings, touch lock/brightness, resilience tests,
+   and outdoor/power validation.

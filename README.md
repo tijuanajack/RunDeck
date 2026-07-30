@@ -25,9 +25,12 @@ ESP32-S3-Touch-AMOLED-2.41-B, paired with an Android phone.
 3. Build `firmware/RunDeck/RunDeck.ino` for the Waveshare ESP32-S3 board after
    the vendor LVGL test has flashed successfully.
 
-The first implemented milestone is a standalone, simulated-data firmware UI.
-Android, live GPS, heart-rate, media, and notification integrations are
-scaffolded/documented but require physical-device validation before release.
+The currently verified milestone is an end-to-end Android GPS run: the phone's
+foreground location service sends live pace, distance, elapsed time, and
+pace-target status to the ESP32 display over BLE. A short real walk has
+verified that phone and display values agree. See
+[implementation status](docs/status.md) for the exact boundary between working
+features and planned V1 work.
 
 ## Git workflow
 
