@@ -24,20 +24,31 @@ blindly flash another firmware build.
    sg dialout -c './tools/restore-factory.sh /dev/ttyACM0'
    ```
 
-3. **Stop and inspect the board.** Confirm the factory display appears, touch
+3. Use a known-good direct USB **data** cable. If a full-image write drops,
+   put the board in BOOT mode (hold BOOT while connecting USB for three
+   seconds), reconnect with a different cable, and rerun the restore. The
+   recovery script intentionally uses the ROM loader at 115200 baud for this
+   board.
+
+4. **Stop and inspect the board.** Confirm the factory display appears, touch
    responds where applicable, and it still boots after one USB unplug/replug.
    If this fails, do not flash RunDeck again: record the behavior, cable/power
    source, and serial output first.
 
-4. Only after the factory cold-boot gate passes, compile and flash the current
-   source to the same confirmed Espressif port.
+5. Do **not** flash the Arduino RunDeck build yet: on this board the generic
+   vendor Arduino and ESP-IDF images both hash-verify yet leave the panel
+   black. First extract and reproduce the factory boot, partition, display,
+   and power configuration.
+
+6. Only after that configuration passes three cold boots, compile and flash
+   the current source to the same confirmed Espressif port.
 
    ```sh
    cd firmware
    sg dialout -c '/home/tjhurt/.local/bin/arduino-cli compile --fqbn esp32:esp32:waveshare_esp32_s3_touch_amoled_241 RunDeck --output-dir build && /home/tjhurt/.local/bin/arduino-cli upload --fqbn esp32:esp32:waveshare_esp32_s3_touch_amoled_241 --port /dev/ttyACM0 RunDeck'
    ```
 
-5. Verify RunDeck while USB-powered, then cold-boot it three times (unplug for
+7. Verify RunDeck while USB-powered, then cold-boot it three times (unplug for
    five seconds, reconnect, wait up to 15 seconds). Test BLE only after all
    three cold boots show the display. A release is not considered stable until
    it passes this gate.

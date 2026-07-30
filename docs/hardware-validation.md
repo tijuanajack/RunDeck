@@ -32,14 +32,19 @@ Waveshare archive and its behavior recorded.
 
 ## 2026-07-30 cold-boot finding
 
-The full factory backup boots after a five-second USB unplug/replug. Both the
-RunDeck Arduino build and Waveshare's untouched Arduino `09_LVGL_Test` build
-uploaded successfully and rendered after the upload reset, but remained black
-after the same true cold boot. The Arduino path is therefore not a valid
-hardware bring-up baseline for this board as currently configured. The factory
-backup has a different bootloader and partition table. Preserve the board on
-the factory image while the vendor ESP-IDF/factory boot configuration is
-investigated.
+The full factory backup boots after a five-second USB unplug/replug. With a
+replacement known-good data cable, Waveshare's untouched Arduino
+`09_LVGL_Test` uploaded and hash-verified but left the panel black immediately.
+The untouched vendor ESP-IDF LVGL test also left the panel black. Therefore
+the issue is not RunDeck UI, BLE, touch, or cable reliability; neither generic
+vendor build currently matches this board's factory boot/flash configuration.
+The factory backup has a different bootloader and partition table. Preserve
+the board on the factory image while its configuration is extracted.
+
+The original cable was also defective: full-image recovery repeatedly dropped
+at about 14%. With the replacement cable and the ESP32-S3 ROM loader
+(`--no-stub`, 115200 baud), the complete factory image was restored and hash
+verified.
 
 ## Required procedure
 
