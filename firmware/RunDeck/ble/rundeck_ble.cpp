@@ -111,7 +111,7 @@ void RunDeckBle::begin() {
   Serial.println("RunDeck BLE advertising");
 }
 
-void RunDeckBle::applyLiveMetrics(DisplayState* state, uint32_t nowMs) {
+bool RunDeckBle::applyLiveMetrics(DisplayState* state, uint32_t nowMs) {
   LiveMetrics metrics{};
   uint32_t receivedAt = 0;
   bool valid = false;
@@ -120,7 +120,7 @@ void RunDeckBle::applyLiveMetrics(DisplayState* state, uint32_t nowMs) {
   metrics = latest;
   receivedAt = receivedAtMs;
   portEXIT_CRITICAL(&metricsMux);
-  if (!valid || nowMs - receivedAt > kMetricsFreshForMs) return;
+  if (!valid || nowMs - receivedAt > kMetricsFreshForMs) return false;
 
   state->phone = {SourceState::Connected, receivedAt};
   state->gps = {SourceState::Connected, receivedAt};
@@ -134,6 +134,7 @@ void RunDeckBle::applyLiveMetrics(DisplayState* state, uint32_t nowMs) {
   else if (metrics.flags & 0x0008) state->statusText = "EASE OFF";
   else if (metrics.flags & 0x0010) state->statusText = "PICK IT UP";
   else state->statusText = "GPS WEAK";
+  return true;
 }
 
 }  // namespace rundeck

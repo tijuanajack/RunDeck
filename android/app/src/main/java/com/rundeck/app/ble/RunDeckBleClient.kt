@@ -9,7 +9,6 @@ import android.bluetooth.BluetoothGattService
 import android.bluetooth.BluetoothManager
 import android.bluetooth.le.BluetoothLeScanner
 import android.bluetooth.le.ScanCallback
-import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
 import android.content.Context
@@ -45,11 +44,21 @@ class RunDeckBleClient(context: Context) {
     private val demoHandler = Handler(Looper.getMainLooper())
     private var streamingDemoMetrics = false
     private var currentRunState: RunUiState? = null
+    private val preferences = appContext.getSharedPreferences("rundeck_ble", Context.MODE_PRIVATE)
+    private var rememberedAddress: String? = preferences.getString(KEY_DEVICE_ADDRESS, null)
+    private var reconnectAttempts = 0
+    private var reconnectEnabled = true
     private val seen = linkedMapOf<String, DiscoveredRunDeck>()
     private val _devices = MutableStateFlow<List<DiscoveredRunDeck>>(emptyList())
     val devices: StateFlow<List<DiscoveredRunDeck>> = _devices.asStateFlow()
     private val _connection = MutableStateFlow<DeviceConnection>(DeviceConnection.Idle)
     val connection: StateFlow<DeviceConnection> = _connection.asStateFlow()
+
+    private val reconnectRunnable = Runnable { reconnectRememberedDevice() }
+
+    init {
+        if (rememberedAddress != null) scheduleReconnect(0L)
+    }
 
     private val scanCallback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
@@ -68,21 +77,22 @@ class RunDeckBleClient(context: Context) {
     private val gattCallback = object : BluetoothGattCallback() {
         @SuppressLint("MissingPermission")
         override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
-            if (status != BluetoothGatt.GATT_SUCCESS) {
-                _connection.value = DeviceConnection.Error("Connection failed ($status)")
+            if (gatt !== this@RunDeckBleClient.gatt) {
                 gatt.close()
+                return
+            }
+            if (status != BluetoothGatt.GATT_SUCCESS) {
+                onDisconnected(gatt, "Connection failed ($status)")
             } else if (newState == BluetoothGatt.STATE_CONNECTED) {
+                reconnectAttempts = 0
                 gatt.discoverServices()
             } else {
-                _connection.value = DeviceConnection.Idle
-                liveMetrics = null
-                streamingDemoMetrics = false
-                demoHandler.removeCallbacksAndMessages(null)
-                gatt.close()
+                onDisconnected(gatt, "RunDeck disconnected")
             }
         }
 
         override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
+            if (gatt !== this@RunDeckBleClient.gatt) return
             val service: BluetoothGattService? = gatt.getService(RunDeckProtocol.SERVICE_UUID)
             liveMetrics = service?.getCharacteristic(RunDeckProtocol.LIVE_METRICS_UUID)
             _connection.value = if (status == BluetoothGatt.GATT_SUCCESS && liveMetrics != null) {
@@ -110,13 +120,12 @@ class RunDeckBleClient(context: Context) {
     @SuppressLint("MissingPermission")
     fun connect(discovered: DiscoveredRunDeck) {
         scanner?.stopScan(scanCallback)
-        _connection.value = DeviceConnection.Connecting(discovered.name)
-        gatt?.close()
-        gatt = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            discovered.device.connectGatt(appContext, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
-        } else {
-            discovered.device.connectGatt(appContext, false, gattCallback)
-        }
+        if (gatt?.device?.address == discovered.address && _connection.value !is DeviceConnection.Idle) return
+        rememberedAddress = discovered.address
+        preferences.edit().putString(KEY_DEVICE_ADDRESS, discovered.address).apply()
+        reconnectEnabled = true
+        reconnectAttempts = 0
+        connectDevice(discovered.device, discovered.name)
     }
 
     @SuppressLint("MissingPermission")
@@ -174,7 +183,9 @@ class RunDeckBleClient(context: Context) {
         demoHandler.post(object : Runnable {
             override fun run() {
                 if (!streamingDemoMetrics || liveMetrics == null) return
-                currentRunState?.takeIf { it.active }?.let(::sendRunMetrics) ?: sendDemoMetrics()
+                // Demo frames are intentionally never automatic. A disconnected
+                // or inactive phone must become visibly unavailable on RunDeck.
+                currentRunState?.takeIf { it.active }?.let(::sendRunMetrics)
                 demoHandler.postDelayed(this, 1_000)
             }
         })
@@ -182,9 +193,60 @@ class RunDeckBleClient(context: Context) {
 
     @SuppressLint("MissingPermission")
     fun close() {
+        reconnectEnabled = false
+        demoHandler.removeCallbacks(reconnectRunnable)
         streamingDemoMetrics = false
         demoHandler.removeCallbacksAndMessages(null)
         scanner?.stopScan(scanCallback)
         gatt?.close(); gatt = null; liveMetrics = null
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun connectDevice(device: BluetoothDevice, name: String) {
+        demoHandler.removeCallbacks(reconnectRunnable)
+        gatt?.close()
+        liveMetrics = null
+        _connection.value = DeviceConnection.Connecting(name)
+        gatt = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            device.connectGatt(appContext, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
+        } else device.connectGatt(appContext, false, gattCallback)
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun reconnectRememberedDevice() {
+        val address = rememberedAddress ?: return
+        val adapter = bluetoothManager?.adapter ?: return
+        if (!reconnectEnabled || !adapter.isEnabled || gatt != null) return
+        runCatching { adapter.getRemoteDevice(address) }
+            .onSuccess { connectDevice(it, "RunDeck") }
+            .onFailure { _connection.value = DeviceConnection.Error("Saved RunDeck is unavailable") }
+    }
+
+    private fun scheduleReconnect(delayMs: Long) {
+        demoHandler.removeCallbacks(reconnectRunnable)
+        demoHandler.postDelayed(reconnectRunnable, delayMs)
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun onDisconnected(closedGatt: BluetoothGatt, reason: String) {
+        if (closedGatt !== gatt) return
+        liveMetrics = null
+        streamingDemoMetrics = false
+        demoHandler.removeCallbacksAndMessages(null)
+        gatt = null
+        closedGatt.close()
+        if (reconnectEnabled && rememberedAddress != null && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+            val delayMs = 1_000L shl reconnectAttempts.coerceAtMost(3)
+            reconnectAttempts += 1
+            _connection.value = DeviceConnection.Connecting("RunDeck (reconnecting)")
+            scheduleReconnect(delayMs)
+        } else {
+            _connection.value = DeviceConnection.Error(reason)
+        }
+    }
+
+    private companion object {
+        const val KEY_DEVICE_ADDRESS = "device_address"
+        const val MAX_RECONNECT_ATTEMPTS = 5
     }
 }

@@ -41,7 +41,18 @@ void loop() {
   if (now - lastRenderMs >= 1000) {
     lastRenderMs = now;
     auto state = simulator.next(now);
-    ble.applyLiveMetrics(&state, now);
+    if (!ble.applyLiveMetrics(&state, now)) {
+      // A lost phone must never look like a credible live run. Keep the
+      // dashboard legible while making every live metric visibly unavailable.
+      state.phone = {rundeck::SourceState::Unavailable, now};
+      state.gps = {rundeck::SourceState::Unavailable, now};
+      state.heartRate = {rundeck::SourceState::Unavailable, now};
+      state.paceMinutesPerMile = 0.0f;
+      state.distanceMiles = 0.0f;
+      state.elapsedSeconds = 0;
+      state.heartRateBpm = 0;
+      state.statusText = "PHONE OFFLINE";
+    }
     dashboard.render(state);
     Serial.printf("pace=%.2f hr=%u status=%s\n", state.paceMinutesPerMile,
                   state.heartRateBpm, state.statusText);
