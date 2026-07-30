@@ -39,6 +39,9 @@ Waveshare archive and its behavior recorded.
 4. Only then port the minimal display/touch adapter into `firmware/RunDeck`.
 5. Record battery ADC behavior both on USB and an installed LiPo. No battery
    percentage may be shown in RunDeck before this evidence exists.
+6. Once all required checks pass, use `RUNDECK_HARDWARE_VALIDATED=1
+   firmware/tools/flash-rundeck.sh` to build and flash RunDeck. The script
+   requires exactly one detected serial board.
 
 BOOT remains a boot/recovery control. PWR is not assigned any RunDeck safety
 action until it has been electrically and behaviorally tested.

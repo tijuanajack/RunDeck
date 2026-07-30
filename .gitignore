@@ -3,7 +3,10 @@
 .DS_Store
 *.zip
 firmware/vendor/
-firmware/build/
+firmware/build*/
+firmware/RunDeck/esp_lcd_*.c
+firmware/RunDeck/esp_lcd_*.h
+firmware/RunDeck/board/vendor/
 android/.gradle/
 android/**/build/
 local.properties

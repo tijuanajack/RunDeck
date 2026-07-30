@@ -24,8 +24,13 @@ composition root.
 
 ## Flashing
 
-Use the board/port reported by `arduino-cli board list`, enabling USB CDC on
-boot where the installed board package exposes that option. Record the exact
-FQBN and upload command in `docs/hardware-validation.md` after the first
-successful flash; this repository does not invent board flags that have not
-been validated on the delivered revision.
+Use the vendor-supported FQBN `esp32:esp32:waveshare_esp32_s3_touch_amoled_241`.
+After the vendor smoke-test results are recorded, connect exactly one board and
+run:
+
+```sh
+RUNDECK_HARDWARE_VALIDATED=1 ./tools/flash-rundeck.sh
+```
+
+The script refuses to flash before validation and refuses ambiguous multi-board
+selection. It compiles the same source immediately before upload.

@@ -13,8 +13,13 @@ class Dashboard {
 
  private:
   lv_obj_t* pace_ = nullptr;
+  lv_obj_t* paceTarget_ = nullptr;
   lv_obj_t* status_ = nullptr;
-  lv_obj_t* metrics_ = nullptr;
+  lv_obj_t* distance_ = nullptr;
+  lv_obj_t* elapsed_ = nullptr;
+  lv_obj_t* hr_ = nullptr;
+  lv_obj_t* hrTarget_ = nullptr;
+  lv_obj_t* topLine_ = nullptr;
   lv_obj_t* media_ = nullptr;
   lv_obj_t* notification_ = nullptr;
 };

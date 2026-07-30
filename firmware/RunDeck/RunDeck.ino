@@ -1,8 +1,16 @@
+#define LV_CONF_INCLUDE_SIMPLE
 #include <Arduino.h>
 #include <lvgl.h>
 
 #include "app/simulated_data.h"
+#include "board/waveshare_board.h"
 #include "ui/dashboard.h"
+
+// Arduino CLI does not compile sketch subdirectories. Keep the implementation
+// modular on disk, then include it once at the composition root.
+#include "app/simulated_data.cpp"
+#include "ui/dashboard.cpp"
+#include "board/waveshare_board.cpp"
 
 // Board initialization deliberately remains a narrow adapter until the exact
 // delivered display is validated with the unmodified Waveshare LVGL test.
@@ -16,9 +24,10 @@ uint32_t lastRenderMs = 0;
 void setup() {
   Serial.begin(115200);
   Serial.println("RunDeck simulated UI booting");
-  // TODO(board): initialize SH8601 QSPI panel, FT5x06 touch, LVGL draw buffers,
-  // tick timer, and LVGL task from the validated Waveshare demo adapter.
-  lv_init();
+  if (!rundeck::beginWaveshareBoard()) {
+    Serial.println("RunDeck board initialization failed");
+    while (true) delay(1000);
+  }
   dashboard.begin();
 }
 
