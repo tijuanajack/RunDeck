@@ -15,6 +15,12 @@ Last verified: 2026-07-30.
   panel after upload reset but still black-screens after a true USB cold boot.
   The next firmware test must capture its serial cold-boot log; the board has
   been restored to factory afterward.
+- Cold-boot serial capture isolated the initial failure to an obsolete
+  FactoryProgram touch initialization path: current component resolution
+  rejects its `scl_speed_hz` setting for a legacy I2C adapter. The factory
+  binary instead uses `esp_lcd_touch_new_i2c_ft5x06`. Treat the downloaded
+  source as stale; the next step is a newer BSP revision with locked
+  dependencies, not another flash attempt.
 - The factory image bootloader and partition table differ from the Arduino
   output. Do **not** flash another Arduino build as a normal development step.
   The next firmware task is to reproduce the factory/vendor boot configuration

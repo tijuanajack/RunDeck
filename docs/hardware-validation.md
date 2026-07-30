@@ -54,6 +54,16 @@ after a true USB cold boot. The remaining investigation must capture serial
 logs from that cold boot and compare runtime initialization behavior; do not
 replace it with another speculative display build.
 
+Serial diagnostics identified the immediate incompatibility: the downloaded
+FactoryProgram source uses the obsolete legacy I2C panel wrapper, while the
+factory binary uses `esp_lcd_touch_new_i2c_ft5x06`. With the current resolved
+`esp_lcd_touch_ft5x06` component, the former aborts because it supplies
+`scl_speed_hz` to a legacy I2C driver. Waveshare documents that this Factory
+Program is IDF-version-sensitive and advises its supplied test binary for
+validation. Do not rely on the archive's floating component dependencies;
+obtain or reconstruct the newer factory BSP revision and lock every component
+before the next device flash.
+
 ## Required procedure
 
 1. Fetch the vendor archive using `firmware/tools/fetch-waveshare-bsp.sh`.

@@ -41,6 +41,11 @@ blindly flash another firmware build.
    boot. Capture serial cold-boot logs and compare runtime initialization
    before attempting another firmware candidate.
 
+   The captured failure is a stale FactoryProgram touch path that passes a
+   nonzero `scl_speed_hz` into a legacy I2C panel adapter. The factory binary
+   uses the newer direct FT5x06 API. Lock a compatible BSP/component revision
+   before attempting a replacement build.
+
 6. Only after that configuration passes three cold boots, compile and flash
    the current source to the same confirmed Espressif port.
 
