@@ -17,7 +17,6 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
-import android.os.ParcelUuid
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -51,7 +50,8 @@ class RunDeckBleClient(context: Context) {
     private val scanCallback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
             val device = result.device
-            val name = device.name ?: "RunDeck (${device.address.takeLast(5)})"
+            val name = device.name ?: return
+            if (!name.equals("RunDeck", ignoreCase = true)) return
             seen[device.address] = DiscoveredRunDeck(name, device.address, result.rssi, device)
             _devices.value = seen.values.sortedByDescending { it.rssi }
         }
@@ -96,9 +96,11 @@ class RunDeckBleClient(context: Context) {
             _connection.value = DeviceConnection.Error("Bluetooth is unavailable or switched off")
             return
         }
+        // Android reports SCAN_FAILED_ALREADY_STARTED if the user taps again
+        // while a prior request is still active. Replacing it is deterministic.
+        bluetoothScanner.stopScan(scanCallback)
         seen.clear(); _devices.value = emptyList(); _connection.value = DeviceConnection.Scanning
-        val filters = listOf(ScanFilter.Builder().setServiceUuid(ParcelUuid(RunDeckProtocol.SERVICE_UUID)).build())
-        bluetoothScanner.startScan(filters, ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build(), scanCallback)
+        bluetoothScanner.startScan(emptyList(), ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build(), scanCallback)
     }
 
     @SuppressLint("MissingPermission")

@@ -96,6 +96,7 @@ void RunDeckBle::begin() {
   service->createCharacteristic(kHeartbeatUuid, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::NOTIFY);
   service->start();
   NimBLEAdvertising* advertising = NimBLEDevice::getAdvertising();
+  advertising->setName("RunDeck");
   advertising->addServiceUUID(kServiceUuid);
   NimBLEDevice::startAdvertising();
   Serial.println("RunDeck BLE advertising");
