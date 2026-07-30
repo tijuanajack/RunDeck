@@ -132,7 +132,7 @@ void Dashboard::render(const DisplayState& state) {
   lv_label_set_text(elapsed_, value);
   snprintf(value, sizeof(value), "%u", state.heartRateBpm);
   lv_label_set_text(hr_, value);
-  lv_label_set_text(hrTarget_, "TARGET 135–150  •  IN ZONE");
+  lv_label_set_text(hrTarget_, "TARGET 135-150  •  IN ZONE");
   snprintf(value, sizeof(value), "%s\n%s", state.mediaTitle, state.mediaArtist);
   lv_label_set_text(media_, value);
 
