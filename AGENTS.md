@@ -33,8 +33,13 @@ planned work.
   reset sequence and passed three true USB unplug/replug cold boots with a
   solid green panel after a full factory restore and app-only flash. It is
   approved as the display-only cold-boot gate, not as full RunDeck firmware.
-  The next firmware step is to port the same reset sequencing into the Arduino
-  RunDeck BSP before reintroducing touch, BLE, and the full UI.
+- The same reset sequence has been ported into the Arduino RunDeck BSP:
+  RunDeck uses no direct LCD reset GPIO, initializes the GPIO47/GPIO48 I2C bus
+  once, configures TCA9554 outputs, pulses EXIO0 before SH8601 panel init, and
+  pulses EXIO1 before FT5x06 touch init. Build and flash succeeded, and the
+  user confirmed the RunDeck UI appeared. Before expanding hardware features,
+  ask the user to confirm three physical USB unplug/replug boots still return
+  to the RunDeck UI.
 - Use a known-good direct USB data cable. A failing cable previously dropped
   full-image writes at about 14%; the ROM-loader factory restore succeeded
   after the cable was replaced.

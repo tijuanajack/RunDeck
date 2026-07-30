@@ -20,9 +20,9 @@ Last verified: 2026-07-30.
   user verified three true unplug/replug cold boots returned to a solid green
   display.
 - The factory image bootloader and partition table differ from the Arduino
-  output. Do **not** flash another Arduino build as a normal development step
-  until the V2 TCA9554 reset sequence has been ported into RunDeck's Arduino
-  BSP and passed the same cold-boot gate.
+  output. The Arduino RunDeck BSP now contains the V2 TCA9554 reset sequence;
+  continue to verify physical cold boots before adding more hardware
+  complexity.
 
 ## Working and verified
 
@@ -34,6 +34,11 @@ Last verified: 2026-07-30.
 - The display-only ESP-IDF baseline passes the cold-boot gate with the V2
   TCA9554 OLED reset sequence: build successful, app-only flash verified, and
   three physical USB unplug/replug boots returned to the green test screen.
+- The Arduino RunDeck BSP now follows that V2 reset sequence: direct LCD reset
+  is disabled, GPIO47/GPIO48 I2C is initialized once, TCA9554 EXIO0 is pulsed
+  before SH8601 panel init, and EXIO1 is pulsed before FT5x06 touch init.
+  The Arduino build passed, upload hashes verified, and the user confirmed the
+  full RunDeck UI appeared after flashing on 2026-07-30.
 - Firmware uses Arduino ESP32 core 3.0.7, LVGL 8.4.0, and NimBLE-Arduino 2.5.1.
   The working board configuration uses the vendor SH8601 display path.
 - The device advertises the RunDeck BLE GATT service and Android can discover,
@@ -70,18 +75,16 @@ Last verified: 2026-07-30.
 
 ## Next implementation order
 
-1. Port the V2 TCA9554 OLED reset sequence from `firmware/esp-idf-baseline/`
-   into the Arduino RunDeck BSP; keep direct LCD reset disabled.
-2. Re-run the display-only/full-UI cold-boot gate three times; restore factory
+1. Re-run the full-UI cold-boot gate three times; restore factory
    immediately on any failed cold boot.
-3. Add touch using locked FT5x06 1.1.0-compatible dependencies, then validate
+2. Add touch using locked FT5x06 1.1.0-compatible dependencies, then validate
    cold boot again before reintroducing BLE and RunDeck rendering.
-4. Finish V1 run-state protocol: CBOR preset/run-state characteristic,
+3. Finish V1 run-state protocol: CBOR preset/run-state characteristic,
    acknowledgement/event handling, and resume/discard checkpoint UI.
-5. Add phone-forwarded HR and target/combined pace-HR status rules, then
+4. Add phone-forwarded HR and target/combined pace-HR status rules, then
    evaluate direct Garmin HRM-Dual only behind the BLE-concurrency soak gate.
-6. Add MediaSession metadata/actions and the Music display screen bridge.
-7. Add notification allowlist, sanitization, modal payloads, and permitted
+5. Add MediaSession metadata/actions and the Music display screen bridge.
+6. Add notification allowlist, sanitization, modal payloads, and permitted
    dismissal acknowledgements.
-8. Add weather freshness, settings, touch lock/brightness, resilience tests,
+7. Add weather freshness, settings, touch lock/brightness, resilience tests,
    and outdoor/power validation.

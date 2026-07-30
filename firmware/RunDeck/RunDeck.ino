@@ -14,9 +14,10 @@
 #include "ui/dashboard.cpp"
 #include "board/waveshare_board.cpp"
 
-// Board initialization deliberately remains a narrow adapter until the exact
-// delivered display is validated with the unmodified Waveshare LVGL test.
-// See firmware/README.md and docs/hardware-validation.md.
+// Board initialization deliberately remains a narrow adapter. Keep it aligned
+// with the current Waveshare V2 LVGL reset sequence: no direct LCD reset GPIO,
+// OLED reset through TCA9554 EXIO0, and touch reset through EXIO1.
+// See AGENTS.md and docs/status.md before changing hardware startup.
 namespace {
 rundeck::SimulatedData simulator;
 rundeck::Dashboard dashboard;

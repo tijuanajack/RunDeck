@@ -24,13 +24,22 @@ constexpr gpio_num_t kData0 = GPIO_NUM_11;
 constexpr gpio_num_t kData1 = GPIO_NUM_12;
 constexpr gpio_num_t kData2 = GPIO_NUM_13;
 constexpr gpio_num_t kData3 = GPIO_NUM_14;
-constexpr gpio_num_t kReset = GPIO_NUM_21;
+constexpr gpio_num_t kReset = GPIO_NUM_NC;
 constexpr gpio_num_t kTouchSda = GPIO_NUM_47;
 constexpr gpio_num_t kTouchScl = GPIO_NUM_48;
+constexpr uint8_t kExpanderAddr = 0x20;
+constexpr uint8_t kExpanderOutputReg = 0x01;
+constexpr uint8_t kExpanderConfigReg = 0x03;
+constexpr uint8_t kExpanderOledResetBit = 1U << 0;
+constexpr uint8_t kExpanderTouchResetBit = 1U << 1;
+constexpr uint8_t kExpanderGpio5Bit = 1U << 5;
+constexpr uint8_t kExpanderOutputMask =
+    kExpanderOledResetBit | kExpanderTouchResetBit | kExpanderGpio5Bit;
 
 esp_lcd_touch_handle_t touch = nullptr;
 lv_disp_draw_buf_t drawBuffer;
 lv_disp_drv_t displayDriver;
+uint8_t expanderState = 0x00;
 
 const sh8601_lcd_init_cmd_t kInit[] = {
     {0xFE, (uint8_t[]){0x20}, 1, 0}, {0x26, (uint8_t[]){0x0A}, 1, 0},
@@ -74,9 +83,57 @@ void readTouch(lv_indev_drv_t*, lv_indev_data_t* data) {
 }
 
 void tick(void*) { lv_tick_inc(2); }
+
+bool beginBoardI2c() {
+  const i2c_config_t i2c = {.mode = I2C_MODE_MASTER, .sda_io_num = kTouchSda, .scl_io_num = kTouchScl,
+      .sda_pullup_en = GPIO_PULLUP_ENABLE, .scl_pullup_en = GPIO_PULLUP_ENABLE,
+      .master = {.clk_speed = 300000}};
+  return i2c_param_config(I2C_NUM_0, &i2c) == ESP_OK &&
+      i2c_driver_install(I2C_NUM_0, i2c.mode, 0, 0, 0) == ESP_OK;
+}
+
+bool writeExpanderRegister(uint8_t reg, uint8_t value) {
+  const uint8_t data[] = {reg, value};
+  return i2c_master_write_to_device(I2C_NUM_0, kExpanderAddr, data, sizeof(data),
+                                    pdMS_TO_TICKS(1000)) == ESP_OK;
+}
+
+bool setExpanderState(uint8_t bit, bool high) {
+  if (high) {
+    expanderState |= bit;
+  } else {
+    expanderState &= static_cast<uint8_t>(~bit);
+  }
+  return writeExpanderRegister(kExpanderOutputReg, expanderState);
+}
+
+bool pulseExpanderReset(uint8_t bit) {
+  if (!setExpanderState(bit, true)) return false;
+  delay(20);
+  if (!setExpanderState(bit, false)) return false;
+  delay(20);
+  if (!setExpanderState(bit, true)) return false;
+  delay(120);
+  return true;
+}
+
+bool beginExpander() {
+  expanderState = 0x00;
+  return writeExpanderRegister(kExpanderOutputReg, expanderState) &&
+      writeExpanderRegister(kExpanderConfigReg, static_cast<uint8_t>(~kExpanderOutputMask));
+}
 }  // namespace
 
 bool beginWaveshareBoard() {
+  if (!beginBoardI2c()) {
+    Serial.println("RunDeck I2C init failed");
+    return false;
+  }
+  if (!beginExpander()) {
+    Serial.println("RunDeck TCA9554 init failed");
+    return false;
+  }
+
   const spi_bus_config_t bus = SH8601_PANEL_BUS_QSPI_CONFIG(kClock, kData0, kData1, kData2, kData3,
       kWidth * kHeight * 2);
   if (spi_bus_initialize(SPI2_HOST, &bus, SPI_DMA_CH_AUTO) != ESP_OK) return false;
@@ -85,6 +142,10 @@ bool beginWaveshareBoard() {
   esp_lcd_panel_io_handle_t io = nullptr;
   if (esp_lcd_new_panel_io_spi((esp_lcd_spi_bus_handle_t)SPI2_HOST, &ioConfig, &io) != ESP_OK) return false;
   const sh8601_vendor_config_t vendor = {kInit, sizeof(kInit) / sizeof(kInit[0]), {.use_qspi_interface = 1}};
+  if (!pulseExpanderReset(kExpanderOledResetBit)) {
+    Serial.println("RunDeck OLED reset failed");
+    return false;
+  }
   const esp_lcd_panel_dev_config_t panelConfig = {
       .reset_gpio_num = kReset,
       .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB,
@@ -99,14 +160,12 @@ bool beginWaveshareBoard() {
   // a real USB power loss. Upload reset is warmer and masked this race.
   delay(120);
 
-  const i2c_config_t i2c = {.mode = I2C_MODE_MASTER, .sda_io_num = kTouchSda, .scl_io_num = kTouchScl,
-      .sda_pullup_en = GPIO_PULLUP_ENABLE, .scl_pullup_en = GPIO_PULLUP_ENABLE,
-      .master = {.clk_speed = 300000}};
-  const bool i2cReady = i2c_param_config(I2C_NUM_0, &i2c) == ESP_OK &&
-      i2c_driver_install(I2C_NUM_0, i2c.mode, 0, 0, 0) == ESP_OK;
+  if (!pulseExpanderReset(kExpanderTouchResetBit)) {
+    Serial.println("RunDeck touch reset failed; continuing without touch");
+  }
   esp_lcd_panel_io_handle_t touchIo = nullptr;
   const esp_lcd_panel_io_i2c_config_t touchIoConfig = ESP_LCD_TOUCH_IO_I2C_FT5x06_CONFIG();
-  const bool touchIoReady = i2cReady &&
+  const bool touchIoReady =
       esp_lcd_new_panel_io_i2c((esp_lcd_i2c_bus_handle_t)I2C_NUM_0, &touchIoConfig, &touchIo) == ESP_OK;
   const esp_lcd_touch_config_t touchConfig = {.x_max = kHeight - 1, .y_max = kWidth - 1,
       .rst_gpio_num = GPIO_NUM_NC, .int_gpio_num = GPIO_NUM_NC,
