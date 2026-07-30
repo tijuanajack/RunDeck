@@ -57,6 +57,10 @@ void rounder(lv_disp_drv_t*, lv_area_t* area) {
 }
 
 void readTouch(lv_indev_drv_t*, lv_indev_data_t* data) {
+  if (!touch) {
+    data->state = LV_INDEV_STATE_RELEASED;
+    return;
+  }
   uint16_t x = 0, y = 0;
   uint8_t count = 0;
   esp_lcd_touch_read_data(touch);
@@ -91,18 +95,26 @@ bool beginWaveshareBoard() {
   if (esp_lcd_new_panel_sh8601(io, &panelConfig, &panel) != ESP_OK ||
       esp_lcd_panel_reset(panel) != ESP_OK || esp_lcd_panel_init(panel) != ESP_OK) return false;
   esp_lcd_panel_disp_on_off(panel, true);
+  // The AMOLED controller and shared I2C peripherals need time to settle after
+  // a real USB power loss. Upload reset is warmer and masked this race.
+  delay(120);
 
   const i2c_config_t i2c = {.mode = I2C_MODE_MASTER, .sda_io_num = kTouchSda, .scl_io_num = kTouchScl,
       .sda_pullup_en = GPIO_PULLUP_ENABLE, .scl_pullup_en = GPIO_PULLUP_ENABLE,
       .master = {.clk_speed = 300000}};
-  if (i2c_param_config(I2C_NUM_0, &i2c) != ESP_OK || i2c_driver_install(I2C_NUM_0, i2c.mode, 0, 0, 0) != ESP_OK) return false;
+  const bool i2cReady = i2c_param_config(I2C_NUM_0, &i2c) == ESP_OK &&
+      i2c_driver_install(I2C_NUM_0, i2c.mode, 0, 0, 0) == ESP_OK;
   esp_lcd_panel_io_handle_t touchIo = nullptr;
   const esp_lcd_panel_io_i2c_config_t touchIoConfig = ESP_LCD_TOUCH_IO_I2C_FT5x06_CONFIG();
-  if (esp_lcd_new_panel_io_i2c((esp_lcd_i2c_bus_handle_t)I2C_NUM_0, &touchIoConfig, &touchIo) != ESP_OK) return false;
+  const bool touchIoReady = i2cReady &&
+      esp_lcd_new_panel_io_i2c((esp_lcd_i2c_bus_handle_t)I2C_NUM_0, &touchIoConfig, &touchIo) == ESP_OK;
   const esp_lcd_touch_config_t touchConfig = {.x_max = kHeight - 1, .y_max = kWidth - 1,
       .rst_gpio_num = GPIO_NUM_NC, .int_gpio_num = GPIO_NUM_NC,
       .levels = {.reset = 0, .interrupt = 0}, .flags = {.swap_xy = 1, .mirror_x = 0, .mirror_y = 1}};
-  if (esp_lcd_touch_new_i2c_ft5x06(touchIo, &touchConfig, &touch) != ESP_OK) return false;
+  if (!touchIoReady || esp_lcd_touch_new_i2c_ft5x06(touchIo, &touchConfig, &touch) != ESP_OK) {
+    touch = nullptr;
+    Serial.println("RunDeck touch unavailable; continuing without touch");
+  }
 
   lv_init();
   auto* first = static_cast<lv_color_t*>(heap_caps_malloc(kWidth * kBufferHeight * sizeof(lv_color_t), MALLOC_CAP_DMA));

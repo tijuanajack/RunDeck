@@ -2,6 +2,17 @@
 
 Last verified: 2026-07-30.
 
+## Current hardware gate
+
+- The existing RunDeck firmware failed its first USB cold-boot test: after a
+  five-second unplug/replug the panel stayed dark, while the factory image
+  cold-booted correctly. The board is currently restored to the factory image.
+- A narrowly scoped startup candidate has compiled but is **not yet field
+  verified**. It adds a 250 ms power-settle delay, allows display startup when
+  touch I2C is temporarily unavailable, and retries a failed board
+  initialization instead of remaining in a black infinite loop. Do not call it
+  stable until it passes three physical cold boots.
+
 ## Working and verified
 
 - The repository is connected to authenticated HTTPS `origin` and development

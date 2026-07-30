@@ -26,10 +26,14 @@ uint32_t lastRenderMs = 0;
 
 void setup() {
   Serial.begin(115200);
-  Serial.println("RunDeck simulated UI booting");
+  delay(250);  // cold USB power needs a stable panel supply before QSPI setup
+  Serial.println("RunDeck UI booting");
   if (!rundeck::beginWaveshareBoard()) {
-    Serial.println("RunDeck board initialization failed");
-    while (true) delay(1000);
+    // Do not leave a black, apparently bricked display after a transient cold
+    // start failure. Report it on serial and retry a full initialization.
+    Serial.println("RunDeck board initialization failed; retrying");
+    delay(1500);
+    ESP.restart();
   }
   dashboard.begin();
   ble.begin();
