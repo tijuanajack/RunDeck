@@ -22,7 +22,7 @@ DisplayState SimulatedData::next(uint32_t nowMs) {
       static_cast<uint32_t>(seconds),
       72,
       static_cast<uint32_t>(seconds) % 16 < 8,
-      false,  // Notification overlay is demonstrated only after touch/BLE integration.
+      static_cast<uint32_t>(seconds) % 30 >= 24 && static_cast<uint32_t>(seconds) % 30 < 29,
       weakGps ? "GPS WEAK" : (strapLost ? "STRAP LOST" : "ON TARGET"),
       "Midnight City",
       "M83",
