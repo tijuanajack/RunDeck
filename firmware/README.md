@@ -9,6 +9,7 @@ supported bring-up path. It uses the ESP-IDF display APIs bundled in that core.
 arduino-cli core update-index
 arduino-cli core install esp32:esp32@3.0.7
 arduino-cli lib install lvgl@8.4.0
+arduino-cli lib install NimBLE-Arduino@2.5.1
 ./tools/fetch-waveshare-bsp.sh
 ```
 
@@ -34,3 +35,11 @@ RUNDECK_HARDWARE_VALIDATED=1 ./tools/flash-rundeck.sh
 
 The script refuses to flash before validation and refuses ambiguous multi-board
 selection. It compiles the same source immediately before upload.
+
+## BLE pairing prototype
+
+The display advertises as `RunDeck` with the versioned service specified in
+`protocol/ble-protocol.md`. The Android companion filters for that service and
+writes validated live-metrics frames at 1 Hz. Until a valid frame arrives the
+dashboard uses simulated values; incoming values expire after five seconds and
+never appear live once stale.

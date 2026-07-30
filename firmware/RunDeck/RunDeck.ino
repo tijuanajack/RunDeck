@@ -3,12 +3,14 @@
 #include <lvgl.h>
 
 #include "app/simulated_data.h"
+#include "ble/rundeck_ble.h"
 #include "board/waveshare_board.h"
 #include "ui/dashboard.h"
 
 // Arduino CLI does not compile sketch subdirectories. Keep the implementation
 // modular on disk, then include it once at the composition root.
 #include "app/simulated_data.cpp"
+#include "ble/rundeck_ble.cpp"
 #include "ui/dashboard.cpp"
 #include "board/waveshare_board.cpp"
 
@@ -18,6 +20,7 @@
 namespace {
 rundeck::SimulatedData simulator;
 rundeck::Dashboard dashboard;
+rundeck::RunDeckBle ble;
 uint32_t lastRenderMs = 0;
 }
 
@@ -29,6 +32,7 @@ void setup() {
     while (true) delay(1000);
   }
   dashboard.begin();
+  ble.begin();
 }
 
 void loop() {
@@ -36,7 +40,8 @@ void loop() {
   lv_timer_handler();
   if (now - lastRenderMs >= 1000) {
     lastRenderMs = now;
-    const auto state = simulator.next(now);
+    auto state = simulator.next(now);
+    ble.applyLiveMetrics(&state, now);
     dashboard.render(state);
     Serial.printf("pace=%.2f hr=%u status=%s\n", state.paceMinutesPerMile,
                   state.heartRateBpm, state.statusText);
