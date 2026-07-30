@@ -50,7 +50,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private class DeviceViewModel(application: Application) : AndroidViewModel(application) {
+class DeviceViewModel(application: Application) : AndroidViewModel(application) {
     private val bleClient = RunDeckBleClient(application)
     val devices = bleClient.devices
     val connection = bleClient.connection
