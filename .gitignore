@@ -1,0 +1,9 @@
+.idea/
+.vscode/
+.DS_Store
+*.zip
+firmware/vendor/
+firmware/build/
+android/.gradle/
+android/**/build/
+local.properties
