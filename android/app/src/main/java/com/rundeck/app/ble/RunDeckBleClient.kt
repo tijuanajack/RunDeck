@@ -18,6 +18,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import com.rundeck.app.run.RunUiState
+import com.rundeck.app.run.LongRunTarget
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -141,7 +142,7 @@ class RunDeckBleClient(context: Context) {
             sequence.getAndIncrement() and 0xFFFF,
             SystemClock.elapsedRealtime() and 0xFFFF_FFFFL,
             LiveMetrics(
-                flags = if (pace > 0) 0x0003 else 0x0001,
+                flags = 0x0003 or LongRunTarget.status(state.paceSecondsPerMile).packetFlag,
                 paceCentisecondsPerMile = pace,
                 distanceCentimeters = (state.distanceMeters * 100).roundToInt().toLong(),
                 elapsedSeconds = state.elapsedSeconds,

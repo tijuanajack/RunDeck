@@ -15,6 +15,10 @@ import android.os.SystemClock
 import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 data class RunUiState(
@@ -39,10 +43,13 @@ class RunTrackingService : Service(), LocationListener {
     private var previousLocation: Location? = null
     private val samples = ArrayDeque<LocationSample>()
     private val paceCalculator = PaceCalculator()
+    private val checkpointScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private lateinit var checkpoints: RunCheckpointStore
 
     override fun onCreate() {
         super.onCreate()
         locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        checkpoints = RunCheckpointStore(applicationContext)
         createNotificationChannel()
     }
 
@@ -64,7 +71,7 @@ class RunTrackingService : Service(), LocationListener {
         try {
             locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1_000L, 1f, this)
             locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 2_000L, 2f, this)
-            RunSession.update(RunUiState(active = true, gpsStatus = "ACQUIRING GPS"))
+            publish(RunUiState(active = true, gpsStatus = "ACQUIRING GPS"))
         } catch (_: SecurityException) {
             RunSession.update(RunUiState(gpsStatus = "GPS UNAVAILABLE"))
         }
@@ -86,17 +93,18 @@ class RunTrackingService : Service(), LocationListener {
         val pace = paceCalculator.currentPace(samples.toList()).secondsPerMile
         val elapsedSeconds = ((now - startedAtMs) / 1_000L).coerceAtLeast(0)
         val next = RunUiState(true, elapsedSeconds, distanceMeters, pace, "GPS LIVE")
-        RunSession.update(next)
+        publish(next)
         updateNotification(next)
     }
 
     override fun onProviderDisabled(provider: String) {
-        RunSession.update(RunSession.state.value.copy(gpsStatus = "GPS OFF"))
+        publish(RunSession.state.value.copy(gpsStatus = "GPS OFF"))
     }
 
     private fun stopRun() {
         locationManager.removeUpdates(this)
         RunSession.update(RunUiState())
+        checkpointScope.launch { checkpoints.clear() }
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
@@ -107,6 +115,11 @@ class RunTrackingService : Service(), LocationListener {
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    private fun publish(state: RunUiState) {
+        RunSession.update(state)
+        checkpointScope.launch { checkpoints.save(state) }
+    }
 
     private fun createNotificationChannel() {
         val manager = getSystemService(NotificationManager::class.java)

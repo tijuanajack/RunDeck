@@ -48,6 +48,7 @@ import com.rundeck.app.ble.DiscoveredRunDeck
 import com.rundeck.app.ble.RunDeckBleClient
 import com.rundeck.app.run.RunSession
 import com.rundeck.app.run.RunTrackingService
+import com.rundeck.app.run.LongRunTarget
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -187,7 +188,8 @@ private fun ActiveRunScreen(state: com.rundeck.app.run.RunUiState, onStop: () ->
         Metric("ELAPSED", "%02d:%02d".format(state.elapsedSeconds / 60, state.elapsedSeconds % 60))
     }
     Spacer(Modifier.height(20.dp))
-    Text("Long Run  •  HR < 150  •  Pace 8:50–9:20", color = Lime, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally))
+    val targetStatus = LongRunTarget.status(state.paceSecondsPerMile)
+    Text("TARGET ${LongRunTarget.label}  •  ${targetStatus.label}", color = when (targetStatus) { com.rundeck.app.run.PaceTargetStatus.OnTarget -> Lime; com.rundeck.app.run.PaceTargetStatus.GpsWeak -> Muted; else -> Amber }, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally))
     Spacer(Modifier.weight(1f))
     Button(onClick = onStop, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF451B1B), contentColor = White), modifier = Modifier.fillMaxWidth().height(56.dp)) {
         Text("STOP RUN", fontWeight = FontWeight.Black)

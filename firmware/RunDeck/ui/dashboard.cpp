@@ -11,6 +11,7 @@ const lv_color_t kLime = lv_color_hex(0x9AF000);
 const lv_color_t kCyan = lv_color_hex(0x38D7E4);
 const lv_color_t kGreen = lv_color_hex(0x58D66D);
 const lv_color_t kAmber = lv_color_hex(0xF8C433);
+const lv_color_t kRed = lv_color_hex(0xF04444);
 
 lv_obj_t* label(lv_obj_t* parent, const lv_font_t* font, lv_align_t align, int x, int y,
                 lv_color_t color = kWhite) {
@@ -253,8 +254,8 @@ void Dashboard::updateDashboard() {
     const int seconds = static_cast<int>((state_.paceMinutesPerMile - minutes) * 60.0f);
     snprintf(value, sizeof(value), "%d:%02d", minutes, seconds); lv_label_set_text(pace_, value);
   }
-  snprintf(value, sizeof(value), "TARGET 8:30 / %s", status); lv_label_set_text(paceTarget_, value);
-  lv_obj_set_style_text_color(paceTarget_, status[0] == 'O' ? kLime : kAmber, 0);
+  snprintf(value, sizeof(value), "TARGET 8:50-9:20 / %s", status); lv_label_set_text(paceTarget_, value);
+  lv_obj_set_style_text_color(paceTarget_, status[0] == 'O' ? kLime : (status[0] == 'G' ? kMuted : kRed), 0);
   snprintf(value, sizeof(value), "%.2f", state_.distanceMiles); lv_label_set_text(distance_, value);
   snprintf(value, sizeof(value), "%02lu:%02lu", state_.elapsedSeconds / 60, state_.elapsedSeconds % 60); lv_label_set_text(elapsed_, value);
   snprintf(value, sizeof(value), "%u", state_.heartRateBpm); lv_label_set_text(hr_, value);
