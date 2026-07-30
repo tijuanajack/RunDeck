@@ -14,6 +14,8 @@ import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
 import android.content.Context
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import android.os.ParcelUuid
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,6 +40,8 @@ class RunDeckBleClient(context: Context) {
     private val sequence = AtomicInteger(0)
     private var gatt: BluetoothGatt? = null
     private var liveMetrics: BluetoothGattCharacteristic? = null
+    private val demoHandler = Handler(Looper.getMainLooper())
+    private var streamingDemoMetrics = false
     private val seen = linkedMapOf<String, DiscoveredRunDeck>()
     private val _devices = MutableStateFlow<List<DiscoveredRunDeck>>(emptyList())
     val devices: StateFlow<List<DiscoveredRunDeck>> = _devices.asStateFlow()
@@ -68,6 +72,8 @@ class RunDeckBleClient(context: Context) {
             } else {
                 _connection.value = DeviceConnection.Idle
                 liveMetrics = null
+                streamingDemoMetrics = false
+                demoHandler.removeCallbacksAndMessages(null)
                 gatt.close()
             }
         }
@@ -76,6 +82,7 @@ class RunDeckBleClient(context: Context) {
             val service: BluetoothGattService? = gatt.getService(RunDeckProtocol.SERVICE_UUID)
             liveMetrics = service?.getCharacteristic(RunDeckProtocol.LIVE_METRICS_UUID)
             _connection.value = if (status == BluetoothGatt.GATT_SUCCESS && liveMetrics != null) {
+                startDemoStream()
                 DeviceConnection.Ready(gatt.device.name ?: "RunDeck")
             } else {
                 DeviceConnection.Error("RunDeck protocol service was not found")
@@ -126,8 +133,22 @@ class RunDeckBleClient(context: Context) {
         }
     }
 
+    fun startDemoStream() {
+        if (streamingDemoMetrics) return
+        streamingDemoMetrics = true
+        demoHandler.post(object : Runnable {
+            override fun run() {
+                if (!streamingDemoMetrics || liveMetrics == null) return
+                sendDemoMetrics()
+                demoHandler.postDelayed(this, 1_000)
+            }
+        })
+    }
+
     @SuppressLint("MissingPermission")
     fun close() {
+        streamingDemoMetrics = false
+        demoHandler.removeCallbacksAndMessages(null)
         scanner?.stopScan(scanCallback)
         gatt?.close(); gatt = null; liveMetrics = null
     }
