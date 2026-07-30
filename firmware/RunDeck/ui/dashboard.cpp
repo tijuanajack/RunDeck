@@ -246,9 +246,13 @@ void Dashboard::updateDashboard() {
   const char* title = state_.mediaTitle ? state_.mediaTitle : "MUSIC";
   const char* artist = state_.mediaArtist ? state_.mediaArtist : "";
   char value[96];
-  const int minutes = static_cast<int>(state_.paceMinutesPerMile);
-  const int seconds = static_cast<int>((state_.paceMinutesPerMile - minutes) * 60.0f);
-  snprintf(value, sizeof(value), "%d:%02d", minutes, seconds); lv_label_set_text(pace_, value);
+  if (state_.paceMinutesPerMile <= 0.0f) {
+    lv_label_set_text(pace_, "--:--");
+  } else {
+    const int minutes = static_cast<int>(state_.paceMinutesPerMile);
+    const int seconds = static_cast<int>((state_.paceMinutesPerMile - minutes) * 60.0f);
+    snprintf(value, sizeof(value), "%d:%02d", minutes, seconds); lv_label_set_text(pace_, value);
+  }
   snprintf(value, sizeof(value), "TARGET 8:30 / %s", status); lv_label_set_text(paceTarget_, value);
   lv_obj_set_style_text_color(paceTarget_, status[0] == 'O' ? kLime : kAmber, 0);
   snprintf(value, sizeof(value), "%.2f", state_.distanceMiles); lv_label_set_text(distance_, value);

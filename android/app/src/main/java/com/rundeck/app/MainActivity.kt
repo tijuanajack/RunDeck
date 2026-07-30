@@ -41,12 +41,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rundeck.app.ble.DeviceConnection
 import com.rundeck.app.ble.DiscoveredRunDeck
 import com.rundeck.app.ble.RunDeckBleClient
 import com.rundeck.app.run.RunSession
 import com.rundeck.app.run.RunTrackingService
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -60,6 +63,11 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     private val bleClient = RunDeckBleClient(application)
     val devices = bleClient.devices
     val connection = bleClient.connection
+    init {
+        viewModelScope.launch {
+            RunSession.state.collectLatest(bleClient::publishRunState)
+        }
+    }
     fun scan() = bleClient.startScan()
     fun connect(device: DiscoveredRunDeck) = bleClient.connect(device)
     fun sendDemoMetrics() = bleClient.sendDemoMetrics()

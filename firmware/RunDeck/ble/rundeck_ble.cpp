@@ -56,7 +56,7 @@ class LiveMetricsCallbacks : public NimBLECharacteristicCallbacks {
     LiveMetrics decoded{
         u16(input + 12), u16(input + 14), u32(input + 16), u32(input + 20), u32(input + 24),
         u16(input + 28), static_cast<int16_t>(u16(input + 30)), input[32]};
-    if (decoded.paceCentisecondsPerMile < 100 || decoded.paceCentisecondsPerMile > 300000 ||
+    if (decoded.paceCentisecondsPerMile > 300000 ||
         decoded.heartRateBpm > 240) return;
 
     portENTER_CRITICAL(&metricsMux);

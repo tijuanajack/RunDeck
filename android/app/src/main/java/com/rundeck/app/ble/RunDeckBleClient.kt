@@ -17,10 +17,12 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import com.rundeck.app.run.RunUiState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.math.roundToInt
 
 data class DiscoveredRunDeck(val name: String, val address: String, val rssi: Int, internal val device: BluetoothDevice)
 
@@ -41,6 +43,7 @@ class RunDeckBleClient(context: Context) {
     private var liveMetrics: BluetoothGattCharacteristic? = null
     private val demoHandler = Handler(Looper.getMainLooper())
     private var streamingDemoMetrics = false
+    private var currentRunState: RunUiState? = null
     private val seen = linkedMapOf<String, DiscoveredRunDeck>()
     private val _devices = MutableStateFlow<List<DiscoveredRunDeck>>(emptyList())
     val devices: StateFlow<List<DiscoveredRunDeck>> = _devices.asStateFlow()
@@ -82,7 +85,7 @@ class RunDeckBleClient(context: Context) {
             val service: BluetoothGattService? = gatt.getService(RunDeckProtocol.SERVICE_UUID)
             liveMetrics = service?.getCharacteristic(RunDeckProtocol.LIVE_METRICS_UUID)
             _connection.value = if (status == BluetoothGatt.GATT_SUCCESS && liveMetrics != null) {
-                startDemoStream()
+                startMetricsStream()
                 DeviceConnection.Ready(gatt.device.name ?: "RunDeck")
             } else {
                 DeviceConnection.Error("RunDeck protocol service was not found")
@@ -117,14 +120,43 @@ class RunDeckBleClient(context: Context) {
 
     @SuppressLint("MissingPermission")
     fun sendDemoMetrics() {
-        val characteristic = liveMetrics ?: return
-        val payload = RunDeckProtocol.encodeLiveMetrics(
+        writeMetrics(
             sequence.getAndIncrement() and 0xFFFF,
-            SystemClock.elapsedRealtime(),
+            SystemClock.elapsedRealtime() and 0xFFFF_FFFFL,
             LiveMetrics(flags = 0x000F, paceCentisecondsPerMile = 50500, distanceCentimeters = 12_345,
                 elapsedSeconds = 72, movingSeconds = 70, speedCentimetersPerSecond = 320,
                 temperatureDeciF = 780, forwardedHeartRate = 143),
         )
+    }
+
+    /** Publishes GPS state as the same compact packet the display already understands. */
+    fun publishRunState(state: RunUiState) {
+        currentRunState = state
+        if (state.active) sendRunMetrics(state)
+    }
+
+    private fun sendRunMetrics(state: RunUiState) {
+        val pace = state.paceSecondsPerMile?.times(100)?.roundToInt()?.coerceIn(100, 300_000) ?: 0
+        writeMetrics(
+            sequence.getAndIncrement() and 0xFFFF,
+            SystemClock.elapsedRealtime() and 0xFFFF_FFFFL,
+            LiveMetrics(
+                flags = if (pace > 0) 0x0003 else 0x0001,
+                paceCentisecondsPerMile = pace,
+                distanceCentimeters = (state.distanceMeters * 100).roundToInt().toLong(),
+                elapsedSeconds = state.elapsedSeconds,
+                movingSeconds = state.elapsedSeconds,
+                speedCentimetersPerSecond = 0,
+                temperatureDeciF = 0,
+                forwardedHeartRate = 0,
+            ),
+        )
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun writeMetrics(sequence: Int, sourceMs: Long, metrics: LiveMetrics) {
+        val characteristic = liveMetrics ?: return
+        val payload = RunDeckProtocol.encodeLiveMetrics(sequence, sourceMs, metrics)
         val target = gatt ?: return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             target.writeCharacteristic(characteristic, payload, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT)
@@ -135,13 +167,13 @@ class RunDeckBleClient(context: Context) {
         }
     }
 
-    fun startDemoStream() {
+    fun startMetricsStream() {
         if (streamingDemoMetrics) return
         streamingDemoMetrics = true
         demoHandler.post(object : Runnable {
             override fun run() {
                 if (!streamingDemoMetrics || liveMetrics == null) return
-                sendDemoMetrics()
+                currentRunState?.takeIf { it.active }?.let(::sendRunMetrics) ?: sendDemoMetrics()
                 demoHandler.postDelayed(this, 1_000)
             }
         })
