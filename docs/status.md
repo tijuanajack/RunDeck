@@ -6,34 +6,23 @@ Last verified: 2026-07-30.
 
 - The board is restored to its factory image, which cold-boots correctly with
   a replacement known-good data cable.
-- Waveshare's untouched Arduino `09_LVGL_Test` was built, flashed, and
-  hash-verified but left the panel black immediately. The untouched vendor
-  ESP-IDF LVGL test did the same. This rejects RunDeck source, touch, BLE,
-  UI code, and the original cable as the root cause.
-- The vendor `10_FactoryProgram`, built with ESP-IDF 5.5.2, matches the
-  factory image's 16 MB partition table and boot/app headers. It lights the
-  panel after upload reset but still black-screens after a true USB cold boot.
-  The next firmware test must capture its serial cold-boot log; the board has
-  been restored to factory afterward.
-- Cold-boot serial capture isolated the initial failure to an obsolete
-  FactoryProgram touch initialization path: current component resolution
-  rejects its `scl_speed_hz` setting for a legacy I2C adapter. The component
-  history confirms that FT5x06 `1.1.0` did not set this field, while
-  `1.1.0~1` and `1.1.0~2` do. Treat the downloaded source as stale; floating
-  component versions are prohibited for board bring-up.
+- Earlier downloaded Waveshare examples were stale for this board revision:
+  the old Arduino and ESP-IDF LVGL tests uploaded and hash-verified but left
+  the panel black. The current Waveshare V2 Arduino example shows the missing
+  startup detail: OLED reset is TCA9554 EXIO0, not a direct GPIO21 LCD reset
+  pin. Treat the GPIO21 reset path as rejected.
 - `firmware/esp-idf-baseline/` uses ESP-IDF 5.5.2, `esp_lcd_sh8601 2.0.1~1`,
   and LVGL 8.3.11 with the factory 16 MB/QIO/80 MHz + octal PSRAM and 9 MB
   factory partition configuration. It excludes touch, BLE, Wi-Fi, and factory
-  GPIO diagnostics. It displays a stable full-screen green panel after an
-  upload reset, but **fails after the first true USB cold boot** (black panel,
-  no serial panic). This proves the remaining blocker is below the RunDeck
-  UI, touch, radio, and application layers. The board was restored to the full
-  factory image afterward, which cold-boots normally.
+  GPIO diagnostics. It now sets LCD reset to `GPIO_NUM_NC`, initializes the
+  TCA9554 on GPIO47/GPIO48, and pulses EXIO0 high/low/high before SH8601 panel
+  init. After a full factory restore and app-only flash on 2026-07-30, the
+  user verified three true unplug/replug cold boots returned to a solid green
+  display.
 - The factory image bootloader and partition table differ from the Arduino
-  output. Do **not** flash another Arduino build as a normal development step.
-  The next firmware task is to reproduce the factory/vendor boot configuration
-  and display/power configuration from the factory image, then pass three cold
-  boots before restoring RunDeck functionality.
+  output. Do **not** flash another Arduino build as a normal development step
+  until the V2 TCA9554 reset sequence has been ported into RunDeck's Arduino
+  BSP and passed the same cold-boot gate.
 
 ## Working and verified
 
@@ -42,6 +31,9 @@ Last verified: 2026-07-30.
 - The Waveshare ESP32-S3-Touch-AMOLED-2.41 runs RunDeck at 600 × 450
   landscape. Its black AMOLED UI, touch navigation, dashboard, Music, Stats,
   and notification-overlay prototype are present in `firmware/RunDeck/`.
+- The display-only ESP-IDF baseline passes the cold-boot gate with the V2
+  TCA9554 OLED reset sequence: build successful, app-only flash verified, and
+  three physical USB unplug/replug boots returned to the green test screen.
 - Firmware uses Arduino ESP32 core 3.0.7, LVGL 8.4.0, and NimBLE-Arduino 2.5.1.
   The working board configuration uses the vendor SH8601 display path.
 - The device advertises the RunDeck BLE GATT service and Android can discover,
@@ -78,10 +70,9 @@ Last verified: 2026-07-30.
 
 ## Next implementation order
 
-1. Identify and reproduce the factory-only AMOLED power/startup behavior,
-   including all early pin state and bootloader/application configuration,
-   before any further prototype flash.
-2. Re-run the display-only cold-boot gate three times; restore factory
+1. Port the V2 TCA9554 OLED reset sequence from `firmware/esp-idf-baseline/`
+   into the Arduino RunDeck BSP; keep direct LCD reset disabled.
+2. Re-run the display-only/full-UI cold-boot gate three times; restore factory
    immediately on any failed cold boot.
 3. Add touch using locked FT5x06 1.1.0-compatible dependencies, then validate
    cold boot again before reintroducing BLE and RunDeck rendering.

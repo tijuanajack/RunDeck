@@ -22,20 +22,19 @@ planned work.
 - The verified display implementation is SH8601-based, despite older planning
   references to RM690B0. Do not swap drivers or alter display/panel pin setup
   casually; a prior bad update caused a black-screen recovery event.
-- Critical 2026-07-30 finding: with a verified data cable, Waveshare's
-  untouched **Arduino** LVGL demo uploads and hashes successfully but leaves
-  the panel black; the vendor ESP-IDF LVGL demo did the same. A source and
-  header-matched ESP-IDF 5.5.2 `10_FactoryProgram` build lights the panel after
-  upload reset but still fails after a true USB cold boot. Do not flash another
-  candidate until serial cold-boot diagnostics identify the remaining runtime
-  initialization mismatch. The factory image remains the recovery baseline.
+- Critical 2026-07-30 finding: the current Waveshare V2 Arduino LVGL example
+  resets the OLED through TCA9554 EXIO0 and sets the direct LCD reset pin to
+  `-1`. Older/stale examples and prior RunDeck code used a direct GPIO21 LCD
+  reset path and black-screened after a true USB cold boot. Do not restore the
+  GPIO21 reset path.
 - `firmware/esp-idf-baseline/` is the only approved next firmware candidate.
   It is deliberately display-only and pins ESP-IDF 5.5.2 with
-  `esp_lcd_sh8601 2.0.1~1` and LVGL 8.3.11. It displays a solid green panel
-  after an upload reset but black-screens on the first true USB cold boot,
-  without a serial panic. It is therefore **not approved for reflashing**.
-  The next investigation must focus on the factory-only early power/startup
-  behavior, not RunDeck, touch, BLE, or LVGL.
+  `esp_lcd_sh8601 2.0.1~1` and LVGL 8.3.11. It follows the V2 TCA9554 OLED
+  reset sequence and passed three true USB unplug/replug cold boots with a
+  solid green panel after a full factory restore and app-only flash. It is
+  approved as the display-only cold-boot gate, not as full RunDeck firmware.
+  The next firmware step is to port the same reset sequencing into the Arduino
+  RunDeck BSP before reintroducing touch, BLE, and the full UI.
 - Use a known-good direct USB data cable. A failing cable previously dropped
   full-image writes at about 14%; the ROM-loader factory restore succeeded
   after the cable was replaced.

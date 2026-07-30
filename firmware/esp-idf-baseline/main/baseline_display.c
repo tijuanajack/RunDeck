@@ -1,5 +1,6 @@
 #include <stdint.h>
 
+#include "driver/i2c.h"
 #include "driver/spi_master.h"
 #include "esp_err.h"
 #include "esp_heap_caps.h"
@@ -25,9 +26,21 @@ static const char *const TAG = "rundeck_baseline";
 #define LCD_DATA1 GPIO_NUM_12
 #define LCD_DATA2 GPIO_NUM_13
 #define LCD_DATA3 GPIO_NUM_14
-#define LCD_RST GPIO_NUM_21
+#define LCD_RST GPIO_NUM_NC
 #define LCD_Y_OFFSET 16
 #define LVGL_BUF_ROWS (LCD_V_RES / 10)
+
+/* V2 boards reset the OLED through the TCA9554, not a direct ESP32 GPIO. */
+#define BOARD_I2C_PORT I2C_NUM_0
+#define BOARD_I2C_SDA GPIO_NUM_47
+#define BOARD_I2C_SCL GPIO_NUM_48
+#define BOARD_EXPANDER_ADDR 0x20
+#define TCA9554_OUTPUT_REG 0x01
+#define TCA9554_CONFIG_REG 0x03
+#define TCA9554_OLED_RESET_BIT (1U << 0)
+#define TCA9554_TOUCH_RESET_BIT (1U << 1)
+#define TCA9554_GPIO5_BIT (1U << 5)
+#define TCA9554_OUTPUT_MASK (TCA9554_OLED_RESET_BIT | TCA9554_TOUCH_RESET_BIT | TCA9554_GPIO5_BIT)
 
 static lv_disp_draw_buf_t sDrawBuffers;
 static lv_disp_drv_t sDisplayDriver;
@@ -73,9 +86,59 @@ static void lvgl_tick(void *arg)
     lv_tick_inc(2);
 }
 
+static void tca9554_write_reg(uint8_t reg, uint8_t value)
+{
+    const uint8_t data[] = {reg, value};
+    ESP_ERROR_CHECK(i2c_master_write_to_device(BOARD_I2C_PORT, BOARD_EXPANDER_ADDR,
+                                                data, sizeof(data), pdMS_TO_TICKS(1000)));
+}
+
+static void set_expander_state(uint8_t *state, uint8_t bit, bool high)
+{
+    if (high) {
+        *state |= bit;
+    } else {
+        *state &= (uint8_t)~bit;
+    }
+    tca9554_write_reg(TCA9554_OUTPUT_REG, *state);
+}
+
+static void pulse_expander_reset(uint8_t *state, uint8_t bit)
+{
+    set_expander_state(state, bit, true);
+    vTaskDelay(pdMS_TO_TICKS(20));
+    set_expander_state(state, bit, false);
+    vTaskDelay(pdMS_TO_TICKS(20));
+    set_expander_state(state, bit, true);
+    vTaskDelay(pdMS_TO_TICKS(120));
+}
+
+static void init_expander_for_display(void)
+{
+    const i2c_config_t i2c_config = {
+        .mode = I2C_MODE_MASTER,
+        .sda_io_num = BOARD_I2C_SDA,
+        .sda_pullup_en = GPIO_PULLUP_ENABLE,
+        .scl_io_num = BOARD_I2C_SCL,
+        .scl_pullup_en = GPIO_PULLUP_ENABLE,
+        .master.clk_speed = 300000,
+        .clk_flags = 0,
+    };
+    ESP_ERROR_CHECK(i2c_param_config(BOARD_I2C_PORT, &i2c_config));
+    ESP_ERROR_CHECK(i2c_driver_install(BOARD_I2C_PORT, i2c_config.mode, 0, 0, 0));
+
+    uint8_t output_state = 0;
+    tca9554_write_reg(TCA9554_OUTPUT_REG, output_state);
+    tca9554_write_reg(TCA9554_CONFIG_REG, (uint8_t)~TCA9554_OUTPUT_MASK);
+    ESP_LOGI(TAG, "TCA9554 outputs enabled for OLED/touch reset");
+    pulse_expander_reset(&output_state, TCA9554_OLED_RESET_BIT);
+    ESP_LOGI(TAG, "OLED reset pulsed through TCA9554");
+}
+
 void app_main(void)
 {
     ESP_LOGI(TAG, "cold-boot display gate starting");
+    init_expander_for_display();
     const spi_bus_config_t bus = SH8601_PANEL_BUS_QSPI_CONFIG(
         LCD_PCLK, LCD_DATA0, LCD_DATA1, LCD_DATA2, LCD_DATA3,
         LCD_H_RES * LCD_V_RES * LCD_BITS_PER_PIXEL / 8);
@@ -125,6 +188,6 @@ void app_main(void)
     ESP_LOGI(TAG, "DISPLAY_GATE_PASS: LVGL display initialized");
     while (true) {
         lv_timer_handler();
-        vTaskDelay(pdMS_TO_TICKS(5));
+        vTaskDelay(pdMS_TO_TICKS(20));
     }
 }
