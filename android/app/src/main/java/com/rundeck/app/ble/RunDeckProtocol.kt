@@ -25,6 +25,10 @@ object RunDeckProtocol {
         val frame = ByteBuffer.allocate(HEADER_BYTES + LIVE_METRICS_BYTES).order(ByteOrder.LITTLE_ENDIAN)
         frame.put(VERSION).put(LIVE_METRICS_TYPE).putShort(sequence.toShort()).putInt(sourceMonotonicMs.toInt())
         frame.putShort(LIVE_METRICS_BYTES.toShort())
+        // Two reserved bytes make the fixed v1 header 12 bytes. Firmware
+        // begins the payload at byte 12; keep this explicit to prevent field
+        // shifts that can otherwise look like plausible run data.
+        frame.putShort(0)
         frame.putShort(metrics.flags.toShort()).putShort(metrics.paceCentisecondsPerMile.toShort())
         frame.putInt(metrics.distanceCentimeters.toInt()).putInt(metrics.elapsedSeconds.toInt())
         frame.putInt(metrics.movingSeconds.toInt()).putShort(metrics.speedCentimetersPerSecond.toShort())
@@ -40,6 +44,7 @@ object RunDeckProtocol {
         val sequence = input.short.toInt() and 0xFFFF
         val sourceMs = input.int.toLong() and 0xFFFF_FFFFL
         require((input.short.toInt() and 0xFFFF) == LIVE_METRICS_BYTES) { "Bad payload length" }
+        require(input.short.toInt() == 0) { "Unsupported header extension" }
         val metrics = LiveMetrics(
             flags = input.short.toInt() and 0xFFFF,
             paceCentisecondsPerMile = input.short.toInt() and 0xFFFF,

@@ -50,7 +50,8 @@ class LiveMetricsCallbacks : public NimBLECharacteristicCallbacks {
     const std::string value = characteristic->getValue();
     if (value.size() != kFrameBytes) return;
     const auto* input = reinterpret_cast<const uint8_t*>(value.data());
-    if (input[0] != kProtocolVersion || input[1] != kLiveMetricsType || u16(input + 8) != kLiveMetricsBytes) return;
+    if (input[0] != kProtocolVersion || input[1] != kLiveMetricsType ||
+        u16(input + 8) != kLiveMetricsBytes || u16(input + 10) != 0) return;
     const uint16_t sequence = u16(input + 2);
     const uint32_t sourceMs = u32(input + 4);
     LiveMetrics decoded{

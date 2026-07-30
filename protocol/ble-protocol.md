@@ -14,7 +14,8 @@ replace the first group with `7b2e0001` through `7b2e0007` respectively.
 | `0007` heartbeat/clock | bidirectional | binary | 10 s |
 
 All binary frames use little-endian integers and begin with `version:u8, type:u8, sequence:u16,
-source_monotonic_ms:u32, payload_length:u16`. Receivers reject versions other
+source_monotonic_ms:u32, payload_length:u16, reserved:u16`. The reserved field
+is zero in V1, making the fixed header 12 bytes. Receivers reject versions other
 than `1`, lengths beyond the characteristic limit, non-monotonic sequences,
 and values older than the message-specific freshness window.
 
