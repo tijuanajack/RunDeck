@@ -54,7 +54,7 @@ void Dashboard::begin() {
   lv_obj_t* title = makeLabel(root, &lv_font_montserrat_16, LV_ALIGN_TOP_MID, 0, 16, kLime);
   lv_label_set_text(title, "RUNDECK");
   lv_obj_t* weather = makeLabel(root, &lv_font_montserrat_20, LV_ALIGN_TOP_RIGHT, -18, 14, kAmber);
-  lv_label_set_text(weather, "☼  78°F");
+  lv_label_set_text(weather, "78°F");
 
   rule(root, 132, 50, 100, kLime);
   rule(root, 368, 50, 100, kLime);
@@ -95,12 +95,12 @@ void Dashboard::begin() {
 
   rule(root, 0, 380, 600);
   media_ = makeLabel(root, &lv_font_montserrat_16, LV_ALIGN_BOTTOM_LEFT, 26, -19);
-  lv_obj_t* mediaIcon = makeLabel(root, &lv_font_montserrat_28, LV_ALIGN_BOTTOM_LEFT, 18, -46, kCyan);
-  lv_label_set_text(mediaIcon, "♫");
-  lv_obj_t* bluetooth = makeLabel(root, &lv_font_montserrat_28, LV_ALIGN_BOTTOM_RIGHT, -110, -25, kCyan);
-  lv_label_set_text(bluetooth, "ᛒ");
-  lv_obj_t* battery = makeLabel(root, &lv_font_montserrat_20, LV_ALIGN_BOTTOM_RIGHT, -18, -25, kWhite);
-  lv_label_set_text(battery, "▰ 82%");
+  lv_obj_t* mediaCaption = makeLabel(root, &lv_font_montserrat_14, LV_ALIGN_BOTTOM_LEFT, 26, -55, kCyan);
+  lv_label_set_text(mediaCaption, "NOW PLAYING");
+  lv_obj_t* bluetooth = makeLabel(root, &lv_font_montserrat_16, LV_ALIGN_BOTTOM_RIGHT, -116, -26, kCyan);
+  lv_label_set_text(bluetooth, "BT");
+  lv_obj_t* battery = makeLabel(root, &lv_font_montserrat_16, LV_ALIGN_BOTTOM_RIGHT, -18, -26, kWhite);
+  lv_label_set_text(battery, "BAT 82%");
 
   notification_ = lv_obj_create(root);
   lv_obj_remove_style_all(notification_);
