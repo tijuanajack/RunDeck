@@ -245,6 +245,7 @@ void Dashboard::buildNotification() {
 void Dashboard::updateDashboard() {
   if (page_ != Screen::Dashboard || !pace_) return;
   const char* status = state_.statusText ? state_.statusText : "READY";
+  const char* target = state_.targetLabel ? state_.targetLabel : "8:50-9:20";
   const char* title = state_.mediaTitle ? state_.mediaTitle : "MUSIC";
   const char* artist = state_.mediaArtist ? state_.mediaArtist : "";
   char value[96];
@@ -258,7 +259,7 @@ void Dashboard::updateDashboard() {
     const int seconds = totalSeconds % 60;
     snprintf(value, sizeof(value), "%d:%02d", minutes, seconds); lv_label_set_text(pace_, value);
   }
-  snprintf(value, sizeof(value), "TARGET 8:50-9:20 / %s", status); lv_label_set_text(paceTarget_, value);
+  snprintf(value, sizeof(value), "TARGET %s / %s", target, status); lv_label_set_text(paceTarget_, value);
   lv_obj_set_style_text_color(paceTarget_, status[0] == 'O' ? kLime : (status[0] == 'G' ? kMuted : kRed), 0);
   snprintf(value, sizeof(value), "%.2f", state_.distanceMiles); lv_label_set_text(distance_, value);
   snprintf(value, sizeof(value), "%02lu:%02lu", state_.elapsedSeconds / 60, state_.elapsedSeconds % 60); lv_label_set_text(elapsed_, value);

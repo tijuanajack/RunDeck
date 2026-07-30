@@ -58,6 +58,7 @@ void loop() {
       state.heartRateBpm = 0;
       state.statusText = "PHONE OFFLINE";
     }
+    ble.applyRunState(&state, now);
     dashboard.render(state);
     Serial.printf("pace=%.2f hr=%u status=%s\n", state.paceMinutesPerMile,
                   state.heartRateBpm, state.statusText);

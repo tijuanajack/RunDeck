@@ -24,6 +24,8 @@ DisplayState SimulatedData::next(uint32_t nowMs) {
       static_cast<uint32_t>(seconds) % 16 < 8,
       static_cast<uint32_t>(seconds) % 30 >= 24 && static_cast<uint32_t>(seconds) % 30 < 29,
       weakGps ? "GPS WEAK" : (strapLost ? "STRAP LOST" : "ON TARGET"),
+      "LONG RUN",
+      "8:50-9:20",
       "Midnight City",
       "M83",
   };

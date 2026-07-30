@@ -23,4 +23,26 @@ class RunDeckProtocolTest {
     fun `malformed frame is rejected`() {
         RunDeckProtocol.decodeLiveMetrics(ByteArray(3))
     }
+
+    @Test fun `run state cbor round trip preserves preset and targets`() {
+        val state = RunStatePacket(
+            active = true,
+            presetName = "LONG RUN",
+            targetLabel = "8:50-9:20",
+            paceLowSecondsPerMile = 530,
+            paceHighSecondsPerMile = 560,
+            hrLowBpm = 135,
+            hrHighBpm = 150,
+        )
+
+        val decoded = RunDeckProtocol.decodeRunState(RunDeckProtocol.encodeRunState(44, state))
+
+        assertEquals(44, decoded.sequence)
+        assertEquals(state, decoded.state)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `oversized run state is rejected`() {
+        RunDeckProtocol.decodeRunState(ByteArray(RunDeckProtocol.MAX_RUN_STATE_BYTES + 1))
+    }
 }

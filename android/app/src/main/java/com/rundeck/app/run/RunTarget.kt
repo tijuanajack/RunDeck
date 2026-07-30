@@ -4,7 +4,7 @@ package com.rundeck.app.run
 object LongRunTarget {
     const val lowerSecondsPerMile = 8 * 60 + 50
     const val upperSecondsPerMile = 9 * 60 + 20
-    const val label = "8:50–9:20"
+    const val label = "8:50-9:20"
 
     fun status(paceSecondsPerMile: Double?): PaceTargetStatus = when {
         paceSecondsPerMile == null -> PaceTargetStatus.GpsWeak

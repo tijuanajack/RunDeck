@@ -58,9 +58,11 @@ class RunDeckBleClient(context: Context) {
     private val sequence = AtomicInteger(0)
     private var gatt: BluetoothGatt? = null
     private var liveMetrics: BluetoothGattCharacteristic? = null
+    private var runState: BluetoothGattCharacteristic? = null
     private val demoHandler = Handler(Looper.getMainLooper())
     private var streamingDemoMetrics = false
     private var currentRunState: RunUiState? = null
+    private var lastPublishedRunActive: Boolean? = null
     private val preferences = appContext.getSharedPreferences("rundeck_ble", Context.MODE_PRIVATE)
     private var rememberedAddress: String? = preferences.getString(KEY_DEVICE_ADDRESS, null)
     private var reconnectAttempts = 0
@@ -114,8 +116,10 @@ class RunDeckBleClient(context: Context) {
             if (gatt !== this@RunDeckBleClient.gatt) return
             val service: BluetoothGattService? = gatt.getService(RunDeckProtocol.SERVICE_UUID)
             liveMetrics = service?.getCharacteristic(RunDeckProtocol.LIVE_METRICS_UUID)
-            _connection.value = if (status == BluetoothGatt.GATT_SUCCESS && liveMetrics != null) {
+            runState = service?.getCharacteristic(RunDeckProtocol.RUN_STATE_UUID)
+            _connection.value = if (status == BluetoothGatt.GATT_SUCCESS && liveMetrics != null && runState != null) {
                 _bridge.value = _bridge.value.copy(connected = true, lastError = null)
+                sendRunState(currentRunState ?: RunUiState())
                 startMetricsStream()
                 DeviceConnection.Ready(gatt.device.name ?: "RunDeck")
             } else {
@@ -174,7 +178,41 @@ class RunDeckBleClient(context: Context) {
     fun publishRunState(state: RunUiState) {
         currentRunState = state
         _bridge.value = _bridge.value.copy(streamingRun = state.active)
+        if (lastPublishedRunActive != state.active) {
+            sendRunState(state)
+            lastPublishedRunActive = state.active
+            return
+        }
         if (state.active) sendRunMetrics(state)
+    }
+
+    private fun sendRunState(state: RunUiState) {
+        val characteristic = runState ?: return
+        val target = gatt ?: return
+        val nextSequence = sequence.getAndIncrement() and 0xFFFF
+        val payload = RunDeckProtocol.encodeRunState(
+            nextSequence,
+            RunStatePacket(
+                active = state.active,
+                presetName = "LONG RUN",
+                targetLabel = LongRunTarget.label,
+                paceLowSecondsPerMile = LongRunTarget.lowerSecondsPerMile,
+                paceHighSecondsPerMile = LongRunTarget.upperSecondsPerMile,
+                hrLowBpm = 135,
+                hrHighBpm = 150,
+            ),
+        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val status = target.writeCharacteristic(characteristic, payload, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT)
+            if (status != 0) _bridge.value = _bridge.value.copy(lastError = "RUN STATE QUEUE FAILED ($status)")
+        } else {
+            characteristic.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+            characteristic.value = payload
+            @Suppress("DEPRECATION")
+            if (!target.writeCharacteristic(characteristic)) {
+                _bridge.value = _bridge.value.copy(lastError = "RUN STATE QUEUE FAILED")
+            }
+        }
     }
 
     private fun sendRunMetrics(state: RunUiState) {
@@ -229,7 +267,7 @@ class RunDeckBleClient(context: Context) {
     fun startMetricsStream() {
         if (streamingDemoMetrics) return
         streamingDemoMetrics = true
-        demoHandler.post(object : Runnable {
+        val runnable = object : Runnable {
             override fun run() {
                 if (!streamingDemoMetrics || liveMetrics == null) return
                 // Demo frames are intentionally never automatic. A disconnected
@@ -237,7 +275,8 @@ class RunDeckBleClient(context: Context) {
                 currentRunState?.takeIf { it.active }?.let(::sendRunMetrics)
                 demoHandler.postDelayed(this, 1_000)
             }
-        })
+        }
+        demoHandler.postDelayed(runnable, 250)
     }
 
     @SuppressLint("MissingPermission")
@@ -248,6 +287,7 @@ class RunDeckBleClient(context: Context) {
         demoHandler.removeCallbacksAndMessages(null)
         scanner?.stopScan(scanCallback)
         gatt?.close(); gatt = null; liveMetrics = null
+        runState = null
     }
 
     @SuppressLint("MissingPermission")
@@ -255,6 +295,7 @@ class RunDeckBleClient(context: Context) {
         demoHandler.removeCallbacks(reconnectRunnable)
         gatt?.close()
         liveMetrics = null
+        runState = null
         _connection.value = DeviceConnection.Connecting(name)
         gatt = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             device.connectGatt(appContext, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
@@ -280,6 +321,7 @@ class RunDeckBleClient(context: Context) {
     private fun onDisconnected(closedGatt: BluetoothGatt, reason: String) {
         if (closedGatt !== gatt) return
         liveMetrics = null
+        runState = null
         streamingDemoMetrics = false
         demoHandler.removeCallbacksAndMessages(null)
         gatt = null

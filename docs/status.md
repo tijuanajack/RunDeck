@@ -54,6 +54,15 @@ Last verified: 2026-07-30.
   in-zone value. The firmware build and flash were hash-verified on
   2026-07-30; the Android APK built successfully but was not installed because
   no phone was visible to ADB at that moment.
+- Run-state/preset protocol checkpoint: Android encodes a bounded CBOR
+  run-state packet for characteristic `7b2e0002-...` and sends the Long Run
+  preset, ASCII target label, active flag, pace bounds, and optional HR bounds
+  on connect/start/stop changes. Firmware validates and stores that packet,
+  rejects replayed/malformed/out-of-range payloads, and renders the
+  Android-owned `targetLabel` instead of hardcoding `8:50-9:20`. Android unit
+  tests and `assembleDebug` passed; firmware compile and flash were
+  hash-verified on 2026-07-30. The updated Android APK still needs installation
+  when the phone is visible to ADB.
 - The selected V1 Long Run target is 8:50–9:20 /mi. Android derives
   `ON TARGET`, `EASE OFF`, `PICK IT UP`, or `GPS WEAK` and sends that state to
   the display. Active-run distance, elapsed time, and pace are checkpointed
@@ -67,9 +76,10 @@ Last verified: 2026-07-30.
 - The Android app is still a compact single-module prototype. Hilt, Room,
   feature modules, full preset editing, and active-run recovery/resume UI are
   not implemented.
-- The device currently receives live metrics only. The versioned run-state,
-  media, notification, settings, and heartbeat characteristics exist but their
-  full CBOR/acknowledgement contracts are not implemented end-to-end.
+- The device currently receives live metrics and the first bounded CBOR
+  run-state/preset packet. Acknowledgements, pause/resume/stop commands,
+  media, notification, settings, and heartbeat contracts are not implemented
+  end-to-end.
 - Heart rate remains optional. Live phone-GPS runs display the Garmin strap as
   off/unavailable until an actual HR source is connected. Garmin HRM-Dual
   direct mode, concurrent central/peripheral soak testing, and phone-forwarded
@@ -85,8 +95,8 @@ Last verified: 2026-07-30.
 1. Continue BLE/live phone metrics polish and reconnect visibility; re-run the
    full-UI cold-boot gate three times when the user can physically test it.
    Restore factory immediately on any failed cold boot.
-2. Finish V1 run-state protocol: CBOR preset/run-state characteristic,
-   acknowledgement/event handling, and resume/discard checkpoint UI.
+2. Continue V1 run-state protocol: add acknowledgement/event handling,
+   pause/resume/stop command flow, and resume/discard checkpoint UI.
 3. Add MediaSession metadata/actions and the Music display screen bridge.
 4. Add notification allowlist, sanitization, modal payloads, and permitted
    dismissal acknowledgements; then add weather freshness, settings, touch

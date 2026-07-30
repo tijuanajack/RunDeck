@@ -109,6 +109,11 @@ planned work.
 - Live metrics are v1, little-endian, 33 bytes total. Preserve validation,
   sequence and freshness protections in `firmware/RunDeck/ble/rundeck_ble.cpp`
   and `android/app/src/main/java/com/rundeck/app/ble/RunDeckProtocol.kt`.
+- Run-state `0002` is a bounded fixed-map CBOR packet. Android currently sends
+  Long Run active/inactive, ASCII `targetLabel`, pace bounds, and optional HR
+  bounds on connect/start/stop changes; firmware validates and stores it, then
+  renders the Android-owned target label. Keep display-bound strings ASCII
+  unless LVGL font coverage is intentionally expanded.
 - For the Long Run target, Android owns the 8:50–9:20 /mi rule. Do not hardcode
   a competing target on the display. Firmware currently renders the target and
   status flags sent by Android.

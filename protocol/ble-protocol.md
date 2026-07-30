@@ -19,11 +19,29 @@ is zero in V1, making the fixed header 12 bytes. Receivers reject versions other
 than `1`, lengths beyond the characteristic limit, non-monotonic sequences,
 and values older than the message-specific freshness window.
 
-`LiveMetrics` payload is `flags:u16, pace_centiseconds_per_mile:u16,
+`LiveMetrics` payload on `0001` is `flags:u16, pace_centiseconds_per_mile:u16,
 distance_centimeters:u32, elapsed_seconds:u32, moving_seconds:u32,
 speed_centimeters_per_second:u16, temperature_deci_f:i16,
 forwarded_hr_bpm:u8`. Flags declare which values are valid and whether GPS,
 phone, HR, and weather are connected/stale.
+
+`RunState` payload on `0002` is a bounded CBOR map with unsigned-integer keys.
+Firmware currently accepts only this fixed v1 map and rejects unknown keys,
+oversized payloads, replayed sequences, incompatible versions, out-of-range
+pace/HR bounds, and non-ASCII-overlong labels. Text that can appear on the
+ESP32 display should stay ASCII until the loaded LVGL fonts are expanded.
+
+| Key | Field | Type | Notes |
+| --- | --- | --- | --- |
+| `0` | `version` | uint | Must be `1`. |
+| `1` | `sequence` | uint | `0..65535`, monotonic per run-state stream. |
+| `2` | `active` | bool | Android-owned run active/inactive state. |
+| `3` | `presetName` | text | Max 20 UTF-8 bytes; V1 sends `LONG RUN`. |
+| `4` | `targetLabel` | text | Max 28 UTF-8 bytes; V1 sends `8:50-9:20`. |
+| `5` | `paceLowSecondsPerMile` | uint | Inclusive lower pace target. |
+| `6` | `paceHighSecondsPerMile` | uint | Inclusive upper pace target. |
+| `7` | `hrLowBpm` | uint | Optional HR lower bound. |
+| `8` | `hrHighBpm` | uint | Optional HR upper/ceiling bound. |
 
 Low-frequency CBOR payloads have a 768-byte total limit. Notification text is
 sanitized by Android, truncated to 240 UTF-8 bytes, and fragmented with

@@ -26,6 +26,8 @@ struct DisplayState {
   bool mediaPlaying;
   bool notificationVisible;
   const char* statusText;
+  const char* presetName;
+  const char* targetLabel;
   const char* mediaTitle;
   const char* mediaArtist;
 };

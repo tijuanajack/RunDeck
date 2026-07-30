@@ -2,6 +2,7 @@ package com.rundeck.app.ble
 
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.io.ByteArrayOutputStream
 import java.util.UUID
 
 object RunDeckProtocol {
@@ -18,6 +19,17 @@ object RunDeckProtocol {
     const val LIVE_METRICS_TYPE: Byte = 1
     const val HEADER_BYTES = 12
     const val LIVE_METRICS_BYTES = 21
+    const val MAX_RUN_STATE_BYTES = 128
+
+    private const val RUN_KEY_VERSION = 0
+    private const val RUN_KEY_SEQUENCE = 1
+    private const val RUN_KEY_ACTIVE = 2
+    private const val RUN_KEY_PRESET = 3
+    private const val RUN_KEY_TARGET_LABEL = 4
+    private const val RUN_KEY_PACE_LOW_SECONDS = 5
+    private const val RUN_KEY_PACE_HIGH_SECONDS = 6
+    private const val RUN_KEY_HR_LOW = 7
+    private const val RUN_KEY_HR_HIGH = 8
 
     fun encodeLiveMetrics(sequence: Int, sourceMonotonicMs: Long, metrics: LiveMetrics): ByteArray {
         require(sequence in 0..0xFFFF)
@@ -57,6 +69,137 @@ object RunDeckProtocol {
         )
         return DecodedLiveMetrics(sequence, sourceMs, metrics)
     }
+
+    fun encodeRunState(sequence: Int, state: RunStatePacket): ByteArray {
+        require(sequence in 0..0xFFFF)
+        require(state.presetName.length <= 20)
+        require(state.targetLabel.length <= 28)
+        val output = ByteArrayOutputStream()
+        output.write(0xA9) // fixed CBOR map with 9 integer-keyed entries.
+        output.writeUintEntry(RUN_KEY_VERSION, VERSION.toInt())
+        output.writeUintEntry(RUN_KEY_SEQUENCE, sequence)
+        output.writeBoolEntry(RUN_KEY_ACTIVE, state.active)
+        output.writeTextEntry(RUN_KEY_PRESET, state.presetName)
+        output.writeTextEntry(RUN_KEY_TARGET_LABEL, state.targetLabel)
+        output.writeUintEntry(RUN_KEY_PACE_LOW_SECONDS, state.paceLowSecondsPerMile)
+        output.writeUintEntry(RUN_KEY_PACE_HIGH_SECONDS, state.paceHighSecondsPerMile)
+        output.writeUintEntry(RUN_KEY_HR_LOW, state.hrLowBpm)
+        output.writeUintEntry(RUN_KEY_HR_HIGH, state.hrHighBpm)
+        return output.toByteArray().also { require(it.size <= MAX_RUN_STATE_BYTES) }
+    }
+
+    fun decodeRunState(payload: ByteArray): DecodedRunStatePacket {
+        require(payload.size <= MAX_RUN_STATE_BYTES) { "Run state too large" }
+        val input = CborInput(payload)
+        val entries = input.readMapEntries()
+        var version: Int? = null
+        var sequence: Int? = null
+        var active: Boolean? = null
+        var preset: String? = null
+        var target: String? = null
+        var paceLow: Int? = null
+        var paceHigh: Int? = null
+        var hrLow: Int? = null
+        var hrHigh: Int? = null
+        repeat(entries) {
+            when (input.readUInt()) {
+                RUN_KEY_VERSION -> version = input.readUInt()
+                RUN_KEY_SEQUENCE -> sequence = input.readUInt()
+                RUN_KEY_ACTIVE -> active = input.readBool()
+                RUN_KEY_PRESET -> preset = input.readText()
+                RUN_KEY_TARGET_LABEL -> target = input.readText()
+                RUN_KEY_PACE_LOW_SECONDS -> paceLow = input.readUInt()
+                RUN_KEY_PACE_HIGH_SECONDS -> paceHigh = input.readUInt()
+                RUN_KEY_HR_LOW -> hrLow = input.readUInt()
+                RUN_KEY_HR_HIGH -> hrHigh = input.readUInt()
+                else -> error("Unknown run-state key")
+            }
+        }
+        require(!input.hasRemaining()) { "Trailing run-state bytes" }
+        require(version == VERSION.toInt()) { "Incompatible run-state version" }
+        val decoded = RunStatePacket(
+            active = requireNotNull(active),
+            presetName = requireNotNull(preset),
+            targetLabel = requireNotNull(target),
+            paceLowSecondsPerMile = requireNotNull(paceLow),
+            paceHighSecondsPerMile = requireNotNull(paceHigh),
+            hrLowBpm = requireNotNull(hrLow),
+            hrHighBpm = requireNotNull(hrHigh),
+        )
+        return DecodedRunStatePacket(requireNotNull(sequence), decoded)
+    }
+
+    private fun ByteArrayOutputStream.writeUintEntry(key: Int, value: Int) {
+        writeUInt(key)
+        writeUInt(value)
+    }
+
+    private fun ByteArrayOutputStream.writeBoolEntry(key: Int, value: Boolean) {
+        writeUInt(key)
+        write(if (value) 0xF5 else 0xF4)
+    }
+
+    private fun ByteArrayOutputStream.writeTextEntry(key: Int, value: String) {
+        writeUInt(key)
+        val bytes = value.encodeToByteArray()
+        require(bytes.size <= 255)
+        if (bytes.size <= 23) write(0x60 or bytes.size) else write(0x78).also { write(bytes.size) }
+        write(bytes)
+    }
+
+    private fun ByteArrayOutputStream.writeUInt(value: Int) {
+        require(value >= 0)
+        when {
+            value <= 23 -> write(value)
+            value <= 0xFF -> { write(0x18); write(value) }
+            value <= 0xFFFF -> { write(0x19); write(value shr 8); write(value) }
+            else -> error("Value too large for RunDeck v1 CBOR")
+        }
+    }
+
+    private class CborInput(private val bytes: ByteArray) {
+        private var offset = 0
+
+        fun hasRemaining(): Boolean = offset < bytes.size
+
+        fun readMapEntries(): Int {
+            val first = next()
+            require(first in 0xA0..0xB7) { "Expected fixed CBOR map" }
+            return first and 0x1F
+        }
+
+        fun readUInt(): Int {
+            val first = next()
+            require(first ushr 5 == 0) { "Expected unsigned integer" }
+            return readArgument(first)
+        }
+
+        fun readBool(): Boolean = when (next()) {
+            0xF4 -> false
+            0xF5 -> true
+            else -> error("Expected boolean")
+        }
+
+        fun readText(): String {
+            val first = next()
+            require(first ushr 5 == 3) { "Expected text string" }
+            val length = readArgument(first)
+            require(offset + length <= bytes.size) { "Truncated text string" }
+            return bytes.copyOfRange(offset, offset + length).decodeToString().also { offset += length }
+        }
+
+        private fun readArgument(first: Int): Int = when (val additional = first and 0x1F) {
+            in 0..23 -> additional
+            24 -> next()
+            25 -> (next() shl 8) or next()
+            else -> error("Unsupported CBOR additional info")
+        }
+
+        private fun next(): Int {
+            require(offset < bytes.size) { "Unexpected end of CBOR" }
+            return bytes[offset++].toInt() and 0xFF
+        }
+    }
 }
 
 data class LiveMetrics(
@@ -71,3 +214,15 @@ data class LiveMetrics(
 )
 
 data class DecodedLiveMetrics(val sequence: Int, val sourceMonotonicMs: Long, val metrics: LiveMetrics)
+
+data class RunStatePacket(
+    val active: Boolean,
+    val presetName: String,
+    val targetLabel: String,
+    val paceLowSecondsPerMile: Int,
+    val paceHighSecondsPerMile: Int,
+    val hrLowBpm: Int,
+    val hrHighBpm: Int,
+)
+
+data class DecodedRunStatePacket(val sequence: Int, val state: RunStatePacket)

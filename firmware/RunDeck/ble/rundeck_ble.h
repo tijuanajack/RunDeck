@@ -10,6 +10,8 @@ namespace rundeck {
 class RunDeckBle {
  public:
   void begin();
+  /** Applies the last accepted Android-owned preset/target config, if present. */
+  void applyRunState(DisplayState* state, uint32_t nowMs);
   /** Returns true only when a fresh Android metrics frame was applied. */
   bool applyLiveMetrics(DisplayState* state, uint32_t nowMs);
 };
