@@ -7,11 +7,14 @@ Last verified: 2026-07-30.
 - The existing RunDeck firmware failed its first USB cold-boot test: after a
   five-second unplug/replug the panel stayed dark, while the factory image
   cold-booted correctly. The board is currently restored to the factory image.
-- A narrowly scoped startup candidate has compiled but is **not yet field
-  verified**. It adds a 250 ms power-settle delay, allows display startup when
-  touch I2C is temporarily unavailable, and retries a failed board
-  initialization instead of remaining in a black infinite loop. Do not call it
-  stable until it passes three physical cold boots.
+- Waveshare's untouched Arduino `09_LVGL_Test` was built with its bundled
+  libraries, flashed, and failed the identical cold-boot test. This rejects
+  RunDeck source, touch, BLE, and UI code as the root cause.
+- The factory image bootloader and partition table differ from the Arduino
+  output. Do **not** flash another Arduino build as a normal development step.
+  The next firmware task is to reproduce the factory/vendor boot configuration
+  (likely through the vendor ESP-IDF path) and pass three cold boots before
+  restoring RunDeck functionality.
 
 ## Working and verified
 

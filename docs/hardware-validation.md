@@ -30,6 +30,17 @@ Waveshare archive and its behavior recorded.
 | ADC result, installed LiPo | |
 | Factory restore command/image | |
 
+## 2026-07-30 cold-boot finding
+
+The full factory backup boots after a five-second USB unplug/replug. Both the
+RunDeck Arduino build and Waveshare's untouched Arduino `09_LVGL_Test` build
+uploaded successfully and rendered after the upload reset, but remained black
+after the same true cold boot. The Arduino path is therefore not a valid
+hardware bring-up baseline for this board as currently configured. The factory
+backup has a different bootloader and partition table. Preserve the board on
+the factory image while the vendor ESP-IDF/factory boot configuration is
+investigated.
+
 ## Required procedure
 
 1. Fetch the vendor archive using `firmware/tools/fetch-waveshare-bsp.sh`.

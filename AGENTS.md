@@ -22,6 +22,11 @@ planned work.
 - The verified display implementation is SH8601-based, despite older planning
   references to RM690B0. Do not swap drivers or alter display/panel pin setup
   casually; a prior bad update caused a black-screen recovery event.
+- Critical 2026-07-30 finding: the untouched Waveshare **Arduino** LVGL demo
+  also fails a true USB cold boot on this board. Do not use an Arduino build
+  for routine flashing until its bootloader/partition configuration is matched
+  to the factory image and three cold boots pass. The factory image uses a
+  different bootloader and partition table.
 - FQBN: `esp32:esp32:waveshare_esp32_s3_touch_amoled_241`.
 - Tool versions are pinned for bring-up: ESP32 Arduino core **3.0.7**, LVGL
   **8.4.0**, NimBLE-Arduino **2.5.1**.
