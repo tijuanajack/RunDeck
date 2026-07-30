@@ -12,6 +12,18 @@ class Dashboard {
   void render(const DisplayState& state);
 
  private:
+  static void onGesture(lv_event_t* event);
+  static void onStart(lv_event_t* event);
+  void setPage(Screen page);
+  void buildDashboard();
+  void buildMusic();
+  void buildStats();
+  void buildReady();
+  void updatePage();
+
+  lv_obj_t* root_ = nullptr;
+  Screen page_ = Screen::Dashboard;
+  DisplayState state_{};
   lv_obj_t* pace_ = nullptr;
   lv_obj_t* paceTarget_ = nullptr;
   lv_obj_t* status_ = nullptr;
