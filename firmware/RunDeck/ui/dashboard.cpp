@@ -185,20 +185,17 @@ void Dashboard::render(const DisplayState& state) {
 void Dashboard::updatePage() {
   if (page_ == Screen::Music || page_ == Screen::Stats || page_ == Screen::Ready) return;
   if (!pace_) return;
-  const char* status = state_.statusText ? state_.statusText : "READY";
-  const char* title = state_.mediaTitle ? state_.mediaTitle : "MUSIC --";
-  const char* artist = state_.mediaArtist ? state_.mediaArtist : "";
   char value[96];
   const int minutes = static_cast<int>(state_.paceMinutesPerMile);
   const int seconds = static_cast<int>((state_.paceMinutesPerMile - minutes) * 60.0f);
   snprintf(value, sizeof(value), "%d:%02d", minutes, seconds); lv_label_set_text(pace_, value);
-  snprintf(value, sizeof(value), "TARGET 8:30  •  %s", status); lv_label_set_text(paceTarget_, value);
-  lv_obj_set_style_text_color(paceTarget_, status[0] == 'O' ? kLime : kAmber, 0);
+  snprintf(value, sizeof(value), "TARGET 8:30  •  %s", state_.statusText); lv_label_set_text(paceTarget_, value);
+  lv_obj_set_style_text_color(paceTarget_, state_.statusText[0] == 'O' ? kLime : kAmber, 0);
   snprintf(value, sizeof(value), "%.2f", state_.distanceMiles); lv_label_set_text(distance_, value);
   snprintf(value, sizeof(value), "%02lu:%02lu", state_.elapsedSeconds / 60, state_.elapsedSeconds % 60); lv_label_set_text(elapsed_, value);
   snprintf(value, sizeof(value), "%u", state_.heartRateBpm); lv_label_set_text(hr_, value);
   lv_label_set_text(hrTarget_, "TARGET 135–150  •  IN ZONE");
-  snprintf(value, sizeof(value), "%s\n%s", title, artist); lv_label_set_text(media_, value);
+  snprintf(value, sizeof(value), "%s\n%s", state_.mediaTitle, state_.mediaArtist); lv_label_set_text(media_, value);
   lv_label_set_text(topLine_, "10:42 AM");
 }
 
