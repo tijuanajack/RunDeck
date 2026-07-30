@@ -5,6 +5,9 @@
 firmware/vendor/
 firmware/build*/
 firmware/backups/
+firmware/esp-idf-baseline/build*/
+firmware/esp-idf-baseline/managed_components/
+firmware/esp-idf-baseline/sdkconfig
 firmware/RunDeck/esp_lcd_*.c
 firmware/RunDeck/esp_lcd_*.h
 firmware/RunDeck/board/vendor/

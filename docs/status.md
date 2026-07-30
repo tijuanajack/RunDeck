@@ -17,10 +17,16 @@ Last verified: 2026-07-30.
   been restored to factory afterward.
 - Cold-boot serial capture isolated the initial failure to an obsolete
   FactoryProgram touch initialization path: current component resolution
-  rejects its `scl_speed_hz` setting for a legacy I2C adapter. The factory
-  binary instead uses `esp_lcd_touch_new_i2c_ft5x06`. Treat the downloaded
-  source as stale; the next step is a newer BSP revision with locked
-  dependencies, not another flash attempt.
+  rejects its `scl_speed_hz` setting for a legacy I2C adapter. The component
+  history confirms that FT5x06 `1.1.0` did not set this field, while
+  `1.1.0~1` and `1.1.0~2` do. Treat the downloaded source as stale; floating
+  component versions are prohibited for board bring-up.
+- `firmware/esp-idf-baseline/` is a newly built, display-only cold-boot gate.
+  It pins ESP-IDF 5.5.2 and `esp_lcd_sh8601 2.0.1~1`, preserves the factory
+  16 MB/QIO/80 MHz + octal PSRAM configuration and 9 MB factory partition,
+  and excludes touch, LVGL, BLE, Wi-Fi, and factory GPIO diagnostics. It has
+  **not** been flashed. Its sole success criterion is a solid green panel and
+  `DISPLAY_GATE_PASS` serial log on three USB cold boots.
 - The factory image bootloader and partition table differ from the Arduino
   output. Do **not** flash another Arduino build as a normal development step.
   The next firmware task is to reproduce the factory/vendor boot configuration
@@ -70,12 +76,16 @@ Last verified: 2026-07-30.
 
 ## Next implementation order
 
-1. Finish V1 run-state protocol: CBOR preset/run-state characteristic,
+1. Flash and cold-boot-validate the display-only ESP-IDF baseline three times;
+   restore the factory image immediately on any failed cold boot.
+2. Add touch using locked FT5x06 1.1.0-compatible dependencies, then validate
+   cold boot again before reintroducing LVGL and RunDeck rendering.
+3. Finish V1 run-state protocol: CBOR preset/run-state characteristic,
    acknowledgement/event handling, and resume/discard checkpoint UI.
-2. Add phone-forwarded HR and target/combined pace-HR status rules, then
+4. Add phone-forwarded HR and target/combined pace-HR status rules, then
    evaluate direct Garmin HRM-Dual only behind the BLE-concurrency soak gate.
-3. Add MediaSession metadata/actions and the Music display screen bridge.
-4. Add notification allowlist, sanitization, modal payloads, and permitted
+5. Add MediaSession metadata/actions and the Music display screen bridge.
+6. Add notification allowlist, sanitization, modal payloads, and permitted
    dismissal acknowledgements.
-5. Add weather freshness, settings, touch lock/brightness, resilience tests,
+7. Add weather freshness, settings, touch lock/brightness, resilience tests,
    and outdoor/power validation.

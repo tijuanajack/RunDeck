@@ -29,6 +29,11 @@ planned work.
   upload reset but still fails after a true USB cold boot. Do not flash another
   candidate until serial cold-boot diagnostics identify the remaining runtime
   initialization mismatch. The factory image remains the recovery baseline.
+- `firmware/esp-idf-baseline/` is the only approved next firmware candidate.
+  It is deliberately display-only and pins ESP-IDF 5.5.2 with
+  `esp_lcd_sh8601 2.0.1~1`. It must display solid green and emit
+  `DISPLAY_GATE_PASS` on three USB cold boots before touch, LVGL, BLE, or the
+  RunDeck UI may be brought onto this path. It is built but not yet flashed.
 - Use a known-good direct USB data cable. A failing cable previously dropped
   full-image writes at about 14%; the ROM-loader factory restore succeeded
   after the cable was replaced.
