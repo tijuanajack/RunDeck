@@ -14,9 +14,9 @@ class RunDeckProtocolTest {
     }
 
     @Test fun `live metrics payload begins after the complete 12 byte header`() {
-        val frame = RunDeckProtocol.encodeLiveMetrics(1, 2, LiveMetrics(0x0003, 50500, 1, 2, 2, 0, 0, 0))
-        // flags (03 00) and pace (44 C5) must begin at offsets 12 and 14.
-        assertArrayEquals(byteArrayOf(3, 0, 0x44, 0xC5.toByte()), frame.copyOfRange(12, 16))
+        val frame = RunDeckProtocol.encodeLiveMetrics(1, 2, LiveMetrics(0x0003, 505, 1, 2, 2, 0, 0, 0))
+        // flags (03 00) and pace seconds (F9 01) must begin at offsets 12 and 14.
+        assertArrayEquals(byteArrayOf(3, 0, 0xF9.toByte(), 0x01), frame.copyOfRange(12, 16))
     }
 
     @Test(expected = IllegalArgumentException::class)

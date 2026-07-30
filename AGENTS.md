@@ -109,6 +109,9 @@ planned work.
 - Live metrics are v1, little-endian, 33 bytes total. Preserve validation,
   sequence and freshness protections in `firmware/RunDeck/ble/rundeck_ble.cpp`
   and `android/app/src/main/java/com/rundeck/app/ble/RunDeckProtocol.kt`.
+  The pace field is `uint16 pace_seconds_per_mile`; do not revert it to
+  centiseconds because that overflowed at walking paces and made the device
+  disagree with the phone.
 - Run-state `0002` is a bounded fixed-map CBOR packet. Android currently sends
   Long Run active/inactive, ASCII `targetLabel`, pace bounds, and optional HR
   bounds on connect/start/stop changes; firmware validates and stores it, then

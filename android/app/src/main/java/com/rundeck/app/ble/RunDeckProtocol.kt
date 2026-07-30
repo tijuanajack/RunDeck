@@ -41,7 +41,7 @@ object RunDeckProtocol {
         // begins the payload at byte 12; keep this explicit to prevent field
         // shifts that can otherwise look like plausible run data.
         frame.putShort(0)
-        frame.putShort(metrics.flags.toShort()).putShort(metrics.paceCentisecondsPerMile.toShort())
+        frame.putShort(metrics.flags.toShort()).putShort(metrics.paceSecondsPerMile.toShort())
         frame.putInt(metrics.distanceCentimeters.toInt()).putInt(metrics.elapsedSeconds.toInt())
         frame.putInt(metrics.movingSeconds.toInt()).putShort(metrics.speedCentimetersPerSecond.toShort())
         frame.putShort(metrics.temperatureDeciF.toShort()).put(metrics.forwardedHeartRate.toByte())
@@ -59,7 +59,7 @@ object RunDeckProtocol {
         require(input.short.toInt() == 0) { "Unsupported header extension" }
         val metrics = LiveMetrics(
             flags = input.short.toInt() and 0xFFFF,
-            paceCentisecondsPerMile = input.short.toInt() and 0xFFFF,
+            paceSecondsPerMile = input.short.toInt() and 0xFFFF,
             distanceCentimeters = input.int.toLong() and 0xFFFF_FFFFL,
             elapsedSeconds = input.int.toLong() and 0xFFFF_FFFFL,
             movingSeconds = input.int.toLong() and 0xFFFF_FFFFL,
@@ -204,7 +204,7 @@ object RunDeckProtocol {
 
 data class LiveMetrics(
     val flags: Int,
-    val paceCentisecondsPerMile: Int,
+    val paceSecondsPerMile: Int,
     val distanceCentimeters: Long,
     val elapsedSeconds: Long,
     val movingSeconds: Long,

@@ -19,7 +19,7 @@ is zero in V1, making the fixed header 12 bytes. Receivers reject versions other
 than `1`, lengths beyond the characteristic limit, non-monotonic sequences,
 and values older than the message-specific freshness window.
 
-`LiveMetrics` payload on `0001` is `flags:u16, pace_centiseconds_per_mile:u16,
+`LiveMetrics` payload on `0001` is `flags:u16, pace_seconds_per_mile:u16,
 distance_centimeters:u32, elapsed_seconds:u32, moving_seconds:u32,
 speed_centimeters_per_second:u16, temperature_deci_f:i16,
 forwarded_hr_bpm:u8`. Flags declare which values are valid and whether GPS,

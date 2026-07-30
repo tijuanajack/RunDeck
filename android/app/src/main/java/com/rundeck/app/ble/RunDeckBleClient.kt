@@ -168,7 +168,7 @@ class RunDeckBleClient(context: Context) {
         writeMetrics(
             sequence.getAndIncrement() and 0xFFFF,
             SystemClock.elapsedRealtime() and 0xFFFF_FFFFL,
-            LiveMetrics(flags = 0x000F, paceCentisecondsPerMile = 50500, distanceCentimeters = 12_345,
+            LiveMetrics(flags = 0x000F, paceSecondsPerMile = 505, distanceCentimeters = 12_345,
                 elapsedSeconds = 72, movingSeconds = 70, speedCentimetersPerSecond = 320,
                 temperatureDeciF = 780, forwardedHeartRate = 143),
         )
@@ -216,13 +216,13 @@ class RunDeckBleClient(context: Context) {
     }
 
     private fun sendRunMetrics(state: RunUiState) {
-        val pace = state.paceSecondsPerMile?.times(100)?.roundToInt()?.coerceIn(100, 300_000) ?: 0
+        val pace = state.paceSecondsPerMile?.roundToInt()?.coerceIn(1, 65_535) ?: 0
         writeMetrics(
             sequence.getAndIncrement() and 0xFFFF,
             SystemClock.elapsedRealtime() and 0xFFFF_FFFFL,
             LiveMetrics(
                 flags = 0x0003 or LongRunTarget.status(state.paceSecondsPerMile).packetFlag,
-                paceCentisecondsPerMile = pace,
+                paceSecondsPerMile = pace,
                 distanceCentimeters = (state.distanceMeters * 100).roundToInt().toLong(),
                 elapsedSeconds = state.elapsedSeconds,
                 movingSeconds = state.elapsedSeconds,

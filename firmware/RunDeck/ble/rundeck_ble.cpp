@@ -24,7 +24,7 @@ constexpr uint32_t kMetricsFreshForMs = 5000;
 
 struct LiveMetrics {
   uint16_t flags;
-  uint16_t paceCentisecondsPerMile;
+  uint16_t paceSecondsPerMile;
   uint32_t distanceCentimeters;
   uint32_t elapsedSeconds;
   uint32_t movingSeconds;
@@ -197,7 +197,7 @@ class LiveMetricsCallbacks : public NimBLECharacteristicCallbacks {
     LiveMetrics decoded{
         u16(input + 12), u16(input + 14), u32(input + 16), u32(input + 20), u32(input + 24),
         u16(input + 28), static_cast<int16_t>(u16(input + 30)), input[32]};
-    if (decoded.paceCentisecondsPerMile > 300000 ||
+    if (decoded.paceSecondsPerMile > 65535 ||
         decoded.heartRateBpm > 240) return;
 
     portENTER_CRITICAL(&metricsMux);
@@ -278,15 +278,14 @@ void RunDeckBle::begin() {
 
 void RunDeckBle::applyRunState(DisplayState* state, uint32_t nowMs) {
   (void)nowMs;
-  RunStateConfig config{};
   bool valid = false;
   portENTER_CRITICAL(&metricsMux);
   valid = haveRunState;
-  config = latestRunState;
+  if (valid) {
+    state->presetName = latestRunState.presetName;
+    state->targetLabel = latestRunState.targetLabel;
+  }
   portEXIT_CRITICAL(&metricsMux);
-  if (!valid) return;
-  state->presetName = config.presetName;
-  state->targetLabel = config.targetLabel;
 }
 
 bool RunDeckBle::applyLiveMetrics(DisplayState* state, uint32_t nowMs) {
@@ -303,7 +302,7 @@ bool RunDeckBle::applyLiveMetrics(DisplayState* state, uint32_t nowMs) {
   state->phone = {SourceState::Connected, receivedAt};
   state->gps = {SourceState::Connected, receivedAt};
   state->heartRate = {metrics.heartRateBpm ? SourceState::Connected : SourceState::Unavailable, receivedAt};
-  state->paceMinutesPerMile = metrics.paceCentisecondsPerMile / 6000.0f;
+  state->paceMinutesPerMile = metrics.paceSecondsPerMile / 60.0f;
   state->distanceMiles = metrics.distanceCentimeters / 160934.4f;
   state->elapsedSeconds = metrics.elapsedSeconds;
   state->heartRateBpm = metrics.heartRateBpm;

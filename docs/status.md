@@ -63,6 +63,14 @@ Last verified: 2026-07-30.
   tests and `assembleDebug` passed; firmware compile and flash were
   hash-verified on 2026-07-30. The updated Android APK still needs installation
   when the phone is visible to ADB.
+- Post-install bugfix checkpoint: user reported the Android-owned target label
+  rendered as random symbols and pace did not match the phone while distance
+  and elapsed time did. Firmware now uses the persistent stored run-state
+  buffer for target/preset labels instead of a temporary stack copy. Live
+  metrics pace changed from `uint16` centiseconds-per-mile, which overflowed
+  above about 10:55 /mi, to `uint16` seconds-per-mile so walking paces match
+  the phone. Android tests/build passed; firmware compile, flash, APK install,
+  app launch, and BLE service discovery were verified on 2026-07-30.
 - The selected V1 Long Run target is 8:50–9:20 /mi. Android derives
   `ON TARGET`, `EASE OFF`, `PICK IT UP`, or `GPS WEAK` and sends that state to
   the display. Active-run distance, elapsed time, and pace are checkpointed
