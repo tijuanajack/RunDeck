@@ -27,6 +27,10 @@ planned work.
   **8.4.0**, NimBLE-Arduino **2.5.1**.
 - The factory recovery image is a local, ignored file:
   `firmware/backups/factory-before-rundeck.bin`. Never delete or overwrite it.
+- If the display is black after an update or USB power cycle, follow
+  [the recovery gate](docs/recovery.md). Restore factory, obtain a physical
+  cold-boot confirmation, then and only then flash RunDeck. A successful
+  upload hash is not proof of a successful panel cold boot.
 - BOOT is a recovery control. Do not assign safety-critical behavior to PWR.
 - The normal helper requires `RUNDECK_HARDWARE_VALIDATED=1` and exactly one
   serial device:
