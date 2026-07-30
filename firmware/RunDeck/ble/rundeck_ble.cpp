@@ -76,6 +76,14 @@ class LiveMetricsCallbacks : public NimBLECharacteristicCallbacks {
 
 LiveMetricsCallbacks liveMetricsCallbacks;
 
+class ServerCallbacks : public NimBLEServerCallbacks {
+  void onDisconnect(NimBLEServer*, NimBLEConnInfo&, int) override {
+    NimBLEDevice::startAdvertising();
+  }
+};
+
+ServerCallbacks serverCallbacks;
+
 void addWritable(NimBLEService* service, const char* uuid) {
   service->createCharacteristic(uuid, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR);
 }
@@ -84,6 +92,7 @@ void addWritable(NimBLEService* service, const char* uuid) {
 void RunDeckBle::begin() {
   NimBLEDevice::init("RunDeck");
   NimBLEServer* server = NimBLEDevice::createServer();
+  server->setCallbacks(&serverCallbacks);
   NimBLEService* service = server->createService(kServiceUuid);
   NimBLECharacteristic* live = service->createCharacteristic(
       kLiveMetricsUuid, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR | NIMBLE_PROPERTY::NOTIFY);
