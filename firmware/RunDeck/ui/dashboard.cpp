@@ -1,5 +1,6 @@
 #include "dashboard.h"
 
+#include <math.h>
 #include <stdio.h>
 
 namespace rundeck {
@@ -250,8 +251,11 @@ void Dashboard::updateDashboard() {
   if (state_.paceMinutesPerMile <= 0.0f) {
     lv_label_set_text(pace_, "--:--");
   } else {
-    const int minutes = static_cast<int>(state_.paceMinutesPerMile);
-    const int seconds = static_cast<int>((state_.paceMinutesPerMile - minutes) * 60.0f);
+    // Android rounds total seconds before formatting; do the same so the
+    // display and phone agree rather than differing because of truncation.
+    const int totalSeconds = static_cast<int>(lroundf(state_.paceMinutesPerMile * 60.0f));
+    const int minutes = totalSeconds / 60;
+    const int seconds = totalSeconds % 60;
     snprintf(value, sizeof(value), "%d:%02d", minutes, seconds); lv_label_set_text(pace_, value);
   }
   snprintf(value, sizeof(value), "TARGET 8:50-9:20 / %s", status); lv_label_set_text(paceTarget_, value);

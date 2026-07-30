@@ -131,6 +131,9 @@ bool RunDeckBle::applyLiveMetrics(DisplayState* state, uint32_t nowMs) {
   state->elapsedSeconds = metrics.elapsedSeconds;
   state->heartRateBpm = metrics.heartRateBpm;
   state->temperatureF = static_cast<int8_t>(metrics.temperatureDeciF / 10);
+  // Notifications are not yet supplied by Android. Never leak the simulator's
+  // periodic mock text overlay into a real live run.
+  state->notificationVisible = false;
   if (metrics.flags & 0x0004) state->statusText = "ON TARGET";
   else if (metrics.flags & 0x0008) state->statusText = "EASE OFF";
   else if (metrics.flags & 0x0010) state->statusText = "PICK IT UP";
