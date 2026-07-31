@@ -157,9 +157,10 @@ Last verified: 2026-07-30.
   partial wake lock only while an active run is running, and emits elapsed/
   moving-time state every second between GPS callbacks so the BLE stream does
   not depend on a screen refresh. Android tests/build passed on 2026-07-31;
-  installation is pending until the Samsung is visible to ADB again. A
-  dedicated foreground BLE service and Samsung battery-optimization guidance
-  remain the next resilience step if lock testing still shows dropouts.
+  the updated APK installed/launched successfully on the attached Samsung.
+  A dedicated foreground BLE service and Samsung battery-optimization
+  guidance remain the next resilience step if lock testing still shows
+  dropouts.
 - The selected V1 Long Run target is 8:50–9:20 /mi. Android derives
   `ON TARGET`, `EASE OFF`, `PICK IT UP`, or `GPS WEAK` and sends that state to
   the display. Active-run distance, elapsed time, and pace are checkpointed
