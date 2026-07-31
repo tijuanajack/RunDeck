@@ -102,13 +102,17 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             bleClient.deviceRunControls.collect { control ->
                 val action = when (control) {
+                    DeviceRunControl.Start -> RunTrackingService.ACTION_START
                     DeviceRunControl.Pause -> RunTrackingService.ACTION_PAUSE
                     DeviceRunControl.Resume -> RunTrackingService.ACTION_RESUME
                     DeviceRunControl.Stop -> RunTrackingService.ACTION_STOP
                 }
-                getApplication<Application>().startService(
-                    Intent(getApplication(), RunTrackingService::class.java).setAction(action),
-                )
+                val intent = Intent(getApplication(), RunTrackingService::class.java).setAction(action)
+                if (action == RunTrackingService.ACTION_START) {
+                    getApplication<Application>().startForegroundService(intent)
+                } else {
+                    getApplication<Application>().startService(intent)
+                }
             }
         }
         viewModelScope.launch {

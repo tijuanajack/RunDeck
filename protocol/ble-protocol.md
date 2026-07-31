@@ -118,7 +118,10 @@ Current values:
 | `action` | `3` | Next track. |
 
 Device-origin run-control event (`event_type=0x53`) uses the same 8-byte event
-shape as media controls. Actions are `4=Pause`, `5=Resume`, and `6=Stop`.
+shape as media controls. Actions are `4=Pause`, `5=Resume`, `6=Stop`, and
+`7=Start`. Android dispatches accepted actions to the foreground run service;
+the device changes pages only after the corresponding Android-owned run-state
+packet is received.
 Android dispatches accepted actions to the foreground run service; the device
 marks paused state on the next live-metrics packet.
 

@@ -292,6 +292,17 @@ Last verified: 2026-07-30.
   or MAX brightness and sends the selected level through the acknowledged
   settings packet. Firmware applies it through the SH8601 `0x51` command only
   after the verified panel initialization path completes.
+- Final V1 boot/navigation checkpoint: RunDeck now holds the branded splash
+  until a phone protocol packet arrives, lands on the connected `READY TO RUN`
+  page, and exposes idle-page swipes through Music, Stats, and a device-local
+  `DISPLAY BRIGHTNESS` page. The large device `START RUN` control sends a
+  versioned `0005` start event to Android; the device enters the existing live
+  Dashboard only after Android starts the foreground run and publishes active
+  state. Phone- or device-origin stop returns the device to `READY TO RUN`,
+  while active-run swipes remain limited to Dashboard/Music/Stats/Brightness.
+  The Android protocol decoder, device-event routing, firmware compile, and
+  Android unit/build checks pass. Physical start/stop and brightness taps still
+  require the final smoke test.
 - Heart rate remains optional. Live phone-GPS runs display the Garmin strap as
   off/unavailable until an actual HR source is connected. Phone-forwarded HR
   is implemented and parser/discovery-tested. Garmin HRM-Dual direct mode and

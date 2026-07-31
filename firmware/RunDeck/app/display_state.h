@@ -5,7 +5,7 @@
 namespace rundeck {
 
 enum class SourceState : uint8_t { Connected, Stale, Unavailable, Error };
-enum class Screen : uint8_t { Ready, Dashboard, Music, Stats };
+enum class Screen : uint8_t { Ready, Dashboard, Music, Stats, Brightness };
 
 struct FreshValue {
   SourceState state;

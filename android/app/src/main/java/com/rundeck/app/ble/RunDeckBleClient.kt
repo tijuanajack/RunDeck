@@ -79,7 +79,7 @@ private sealed class GattOperation(val label: String) {
 }
 
 enum class DeviceMediaControl { Previous, PlayPause, Next }
-enum class DeviceRunControl { Pause, Resume, Stop }
+enum class DeviceRunControl { Pause, Resume, Stop, Start }
 
 class RunDeckBleClient(context: Context) {
     private val appContext = context.applicationContext
@@ -635,6 +635,7 @@ class RunDeckBleClient(context: Context) {
                         RunDeckProtocol.RUN_CONTROL_PAUSE -> DeviceRunControl.Pause
                         RunDeckProtocol.RUN_CONTROL_RESUME -> DeviceRunControl.Resume
                         RunDeckProtocol.RUN_CONTROL_STOP -> DeviceRunControl.Stop
+                        RunDeckProtocol.RUN_CONTROL_START -> DeviceRunControl.Start
                         else -> null
                     }
                     if (control != null) _deviceRunControls.tryEmit(control)

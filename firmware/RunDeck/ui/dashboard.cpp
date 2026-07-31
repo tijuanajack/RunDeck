@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "../board/waveshare_board.h"
 #include "brand_splash.h"
 
 namespace rundeck {
@@ -58,13 +59,30 @@ int pageIndex(Screen page) {
     case Screen::Dashboard: return 1;
     case Screen::Music: return 2;
     case Screen::Stats: return 3;
+    case Screen::Brightness: return 4;
   }
   return 1;
 }
 
 Screen pageForIndex(int index) {
-  static constexpr Screen kPages[] = {Screen::Ready, Screen::Dashboard, Screen::Music, Screen::Stats};
+  static constexpr Screen kPages[] = {Screen::Ready, Screen::Dashboard, Screen::Music, Screen::Stats, Screen::Brightness};
+  return kPages[(index + 5) % 5];
+}
+
+Screen runPageForIndex(int index) {
+  static constexpr Screen kPages[] = {Screen::Dashboard, Screen::Music, Screen::Stats, Screen::Brightness};
   return kPages[(index + 4) % 4];
+}
+
+int runPageIndex(Screen page) {
+  switch (page) {
+    case Screen::Dashboard: return 0;
+    case Screen::Music: return 1;
+    case Screen::Stats: return 2;
+    case Screen::Brightness: return 3;
+    case Screen::Ready: return 0;
+  }
+  return 0;
 }
 
 void formatHeartRateTarget(const DisplayState& state, char* output, size_t capacity) {
@@ -98,7 +116,9 @@ void Dashboard::begin() {
 void Dashboard::onPhoneConnected() {
   if (!splashVisible_) return;
   splashVisible_ = false;
-  show(Screen::Dashboard);
+  // Connection lands on the safe, idle page. A run-state packet will move to
+  // Dashboard only when Android actually starts tracking.
+  show(Screen::Ready);
 }
 
 void Dashboard::onGesture(lv_event_t* event) {
@@ -134,13 +154,21 @@ void Dashboard::onGesture(lv_event_t* event) {
     lv_obj_add_flag(self->runControls_, LV_OBJ_FLAG_HIDDEN);
     return;
   }
-  if (direction == LV_DIR_LEFT) self->show(pageForIndex(pageIndex(self->page_) + 1));
-  if (direction == LV_DIR_RIGHT) self->show(pageForIndex(pageIndex(self->page_) - 1));
+  if (direction == LV_DIR_LEFT) {
+    self->show(self->state_.runActive
+                   ? runPageForIndex(runPageIndex(self->page_) + 1)
+                   : pageForIndex(pageIndex(self->page_) + 1));
+  }
+  if (direction == LV_DIR_RIGHT) {
+    self->show(self->state_.runActive
+                   ? runPageForIndex(runPageIndex(self->page_) - 1)
+                   : pageForIndex(pageIndex(self->page_) - 1));
+  }
 }
 
 void Dashboard::onStart(lv_event_t* event) {
   auto* self = static_cast<Dashboard*>(lv_event_get_user_data(event));
-  if (self) self->show(Screen::Dashboard);
+  if (self) self->emitRunControl(RunControlAction::Start);
 }
 
 void Dashboard::onMediaPrevious(lv_event_t* event) {
@@ -166,6 +194,24 @@ void Dashboard::onRunPause(lv_event_t* event) {
 void Dashboard::onRunStop(lv_event_t* event) {
   auto* self = static_cast<Dashboard*>(lv_event_get_user_data(event));
   if (self) self->emitRunControl(RunControlAction::Stop);
+}
+
+void Dashboard::onBrightnessDown(lv_event_t* event) {
+  auto* self = static_cast<Dashboard*>(lv_event_get_user_data(event));
+  if (!self) return;
+  self->brightnessLevel_ = self->brightnessLevel_ <= 64 ? 32 :
+      self->brightnessLevel_ <= 128 ? 64 : self->brightnessLevel_ <= 192 ? 128 : 192;
+  setDisplayBrightness(self->brightnessLevel_);
+  if (self->brightnessValue_) lv_label_set_text_fmt(self->brightnessValue_, "%u%%", (self->brightnessLevel_ * 100u) / 255u);
+}
+
+void Dashboard::onBrightnessUp(lv_event_t* event) {
+  auto* self = static_cast<Dashboard*>(lv_event_get_user_data(event));
+  if (!self) return;
+  self->brightnessLevel_ = self->brightnessLevel_ < 64 ? 64 :
+      self->brightnessLevel_ < 128 ? 128 : self->brightnessLevel_ < 192 ? 192 : 255;
+  setDisplayBrightness(self->brightnessLevel_);
+  if (self->brightnessValue_) lv_label_set_text_fmt(self->brightnessValue_, "%u%%", (self->brightnessLevel_ * 100u) / 255u);
 }
 
 void Dashboard::onTouchLock(lv_event_t* event) {
@@ -225,6 +271,7 @@ void Dashboard::show(Screen page) {
   runControls_ = runPauseButton_ = nullptr;
   touchLockButton_ = touchLockHint_ = nullptr;
   statsStatus_ = statsStatusDetail_ = nullptr;
+  brightnessValue_ = nullptr;
   for (auto& value : statsValues_) value = nullptr;
   runControlsVisible_ = false;
   lv_obj_clean(content_);
@@ -232,6 +279,7 @@ void Dashboard::show(Screen page) {
     case Screen::Ready: buildReady(); break;
     case Screen::Music: buildMusic(); break;
     case Screen::Stats: buildStats(); break;
+    case Screen::Brightness: buildBrightness(); break;
     case Screen::Dashboard: buildDashboard(); break;
   }
   if (!notification_) buildNotification();
@@ -375,6 +423,27 @@ void Dashboard::buildReady() {
   lv_obj_add_event_cb(start, onStart, LV_EVENT_CLICKED, this);
   lv_obj_t* startText = label(start, &lv_font_montserrat_36, LV_ALIGN_CENTER, 0, 0, lv_color_black());
   lv_label_set_text(startText, "START RUN");
+}
+
+void Dashboard::buildBrightness() {
+  lv_obj_t* heading = label(content_, &lv_font_montserrat_28, LV_ALIGN_TOP_MID, 0, 24, kCyan);
+  lv_label_set_text(heading, "DISPLAY BRIGHTNESS");
+  lv_obj_t* hint = label(content_, &lv_font_montserrat_16, LV_ALIGN_TOP_MID, 0, 74, kMuted);
+  lv_label_set_text(hint, "ADJUST RUNDECK AMOLED");
+  brightnessValue_ = label(content_, &lv_font_montserrat_48, LV_ALIGN_CENTER, 0, -30, kWhite);
+  lv_label_set_text_fmt(brightnessValue_, "%u%%", (brightnessLevel_ * 100u) / 255u);
+  lv_obj_t* down = panel(content_, 54, 300, 220, 72, kCyan);
+  lv_obj_add_flag(down, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_add_event_cb(down, onBrightnessDown, LV_EVENT_CLICKED, this);
+  lv_obj_t* downText = label(down, &lv_font_montserrat_20, LV_ALIGN_CENTER, 0, 0, kCyan);
+  lv_label_set_text(downText, "DIMMER");
+  lv_obj_t* up = panel(content_, 326, 300, 220, 72, kLime);
+  lv_obj_add_flag(up, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_add_event_cb(up, onBrightnessUp, LV_EVENT_CLICKED, this);
+  lv_obj_t* upText = label(up, &lv_font_montserrat_20, LV_ALIGN_CENTER, 0, 0, kLime);
+  lv_label_set_text(upText, "BRIGHTER");
+  lv_obj_t* footer = label(content_, &lv_font_montserrat_14, LV_ALIGN_BOTTOM_MID, 0, -18, kMuted);
+  lv_label_set_text(footer, "SWIPE TO RETURN");
 }
 
 void Dashboard::buildNotification() {
@@ -582,6 +651,14 @@ void Dashboard::render(const DisplayState& state) {
       return;
     }
   }
+  if (!renderedState_) {
+    renderedState_ = true;
+    lastRunActive_ = state_.runActive;
+  } else if (state_.runActive != lastRunActive_) {
+    lastRunActive_ = state_.runActive;
+    show(state_.runActive ? Screen::Dashboard : Screen::Ready);
+  }
+  if (state_.runActive && page_ == Screen::Ready) show(Screen::Dashboard);
   updateDashboard();
 }
 

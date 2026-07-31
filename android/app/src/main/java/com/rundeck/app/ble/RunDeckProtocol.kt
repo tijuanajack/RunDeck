@@ -29,6 +29,7 @@ object RunDeckProtocol {
     const val RUN_CONTROL_PAUSE: Byte = 4
     const val RUN_CONTROL_RESUME: Byte = 5
     const val RUN_CONTROL_STOP: Byte = 6
+    const val RUN_CONTROL_START: Byte = 7
     const val ACK_OK: Byte = 0
     const val HEADER_BYTES = 12
     const val LIVE_METRICS_BYTES = 21
@@ -151,7 +152,7 @@ object RunDeckProtocol {
                 val action = input.get()
                 require(input.get().toInt() == 0) { "Unsupported run-control extension" }
                 require(input.short.toInt() == 0) { "Unsupported run-control extension" }
-                require(action in RUN_CONTROL_PAUSE..RUN_CONTROL_STOP) { "Unknown run-control action" }
+                require(action in RUN_CONTROL_PAUSE..RUN_CONTROL_START) { "Unknown run-control action" }
                 DeviceEvent.RunControl(sequence, action)
             }
             DEVICE_EVENT_NOTIFICATION_DISMISSED_TYPE -> {
