@@ -520,10 +520,21 @@ class RunDeckBleClient(context: Context) {
     private fun beginProtocolStream() {
         if (protocolStarted) return
         protocolStarted = true
+        sendProtocolSettings()
         sendRunState(currentRunState ?: RunUiState())
         sendMediaState(currentMediaState)
         publishDisplayContext(currentDisplayContext)
         startHeartbeat()
+    }
+
+    private fun sendProtocolSettings() {
+        val characteristic = displayContext ?: return
+        queueWrite(
+            characteristic,
+            RunDeckProtocol.encodeProtocolSettings(sequence.getAndIncrement() and 0xFFFF),
+            BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT,
+            OP_SETTINGS,
+        )
     }
 
     private fun startHeartbeat() {
@@ -710,6 +721,7 @@ class RunDeckBleClient(context: Context) {
         const val OP_ACK_READ = "ACK READ"
         const val OP_EVENT_SUBSCRIBE = "EVENT SUBSCRIBE"
         const val OP_HEARTBEAT = "HEARTBEAT"
+        const val OP_SETTINGS = "SETTINGS"
         const val HEARTBEAT_INTERVAL_MS = 10_000L
         val CCCD_UUID: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
     }

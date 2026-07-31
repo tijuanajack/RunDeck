@@ -105,6 +105,12 @@ class RunDeckProtocolTest {
         assert(payload.size <= RunDeckProtocol.MAX_DISPLAY_CONTEXT_BYTES)
     }
 
+    @Test fun `protocol settings advertise notification limits`() {
+        val payload = RunDeckProtocol.encodeProtocolSettings(48)
+        assertEquals(0xA4, payload[0].toInt() and 0xFF)
+        assert(payload.size <= RunDeckProtocol.MAX_DISPLAY_CONTEXT_BYTES)
+    }
+
     @Test fun `device ack event decodes command and sequence`() {
         val event = RunDeckProtocol.decodeDeviceEvent(byteArrayOf(
             1,

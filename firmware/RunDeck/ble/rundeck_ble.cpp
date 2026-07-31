@@ -123,6 +123,10 @@ uint16_t lastDisplayContextSequence = 0;
 uint32_t displayContextReceivedAtMs = 0;
 bool haveDisplayContext = false;
 bool haveDisplayContextSequence = false;
+uint16_t lastSettingsSequence = 0;
+uint32_t settingsReceivedAtMs = 0;
+bool haveSettings = false;
+bool haveSettingsSequence = false;
 uint32_t heartbeatReceivedAtMs = 0;
 uint32_t lastHeartbeatSourceMs = 0;
 uint16_t lastHeartbeatSequence = 0;
@@ -359,6 +363,31 @@ bool decodeDisplayContext(const uint8_t* input, size_t size, DisplayContextConfi
   return true;
 }
 
+bool decodeProtocolSettings(const uint8_t* input, size_t size, uint16_t* sequence) {
+  if (size == 0 || size > kDisplayContextMaxBytes) return false;
+  CborReader reader(input, size);
+  uint8_t entries = 0;
+  if (!reader.readMap(&entries) || entries != 4) return false;
+  uint32_t version = 0, decodedSequence = 0, maxFragment = 0, maxNotification = 0;
+  bool seenVersion = false, seenSequence = false, seenFragment = false, seenNotification = false;
+  for (uint8_t i = 0; i < entries; ++i) {
+    uint32_t key = 0;
+    if (!reader.readUInt(&key)) return false;
+    switch (key) {
+      case 0: seenVersion = reader.readUInt(&version); break;
+      case 1: seenSequence = reader.readUInt(&decodedSequence); break;
+      case 2: seenFragment = reader.readUInt(&maxFragment); break;
+      case 3: seenNotification = reader.readUInt(&maxNotification); break;
+      default: return false;
+    }
+  }
+  if (!reader.done() || !seenVersion || !seenSequence || !seenFragment || !seenNotification) return false;
+  if (version != kProtocolVersion || decodedSequence > 0xFFFF || maxFragment != kNotificationFragmentMaxBytes ||
+      maxNotification != kNotificationMaxBytes) return false;
+  *sequence = static_cast<uint16_t>(decodedSequence);
+  return true;
+}
+
 void notifyAck(uint16_t sequence, uint8_t commandType, uint8_t status) {
   if (!deviceEventCharacteristic) return;
   const uint8_t payload[] = {
@@ -579,7 +608,41 @@ class DisplayContextCallbacks : public NimBLECharacteristicCallbacks {
   }
 };
 
-DisplayContextCallbacks displayContextCallbacks;
+class SettingsCallbacks : public NimBLECharacteristicCallbacks {
+  void onWrite(NimBLECharacteristic* characteristic, NimBLEConnInfo&) override {
+    const std::string value = characteristic->getValue();
+    const auto* input = reinterpret_cast<const uint8_t*>(value.data());
+    if (!value.empty() && input[0] == 0xA4) {
+      uint16_t sequence = 0;
+      if (!decodeProtocolSettings(input, value.size(), &sequence)) return;
+      portENTER_CRITICAL(&metricsMux);
+      const bool replayed = haveSettingsSequence && static_cast<int16_t>(sequence - lastSettingsSequence) <= 0;
+      if (!replayed) {
+        lastSettingsSequence = sequence;
+        settingsReceivedAtMs = millis();
+        haveSettings = true;
+        haveSettingsSequence = true;
+      }
+      portEXIT_CRITICAL(&metricsMux);
+      return;
+    }
+    DisplayContextConfig decoded{};
+    if (!decodeDisplayContext(input, value.size(), &decoded)) return;
+    portENTER_CRITICAL(&metricsMux);
+    const bool replayed = haveDisplayContextSequence &&
+        static_cast<int16_t>(decoded.sequence - lastDisplayContextSequence) <= 0;
+    if (!replayed) {
+      latestDisplayContext = decoded;
+      lastDisplayContextSequence = decoded.sequence;
+      displayContextReceivedAtMs = millis();
+      haveDisplayContext = true;
+      haveDisplayContextSequence = true;
+    }
+    portEXIT_CRITICAL(&metricsMux);
+  }
+};
+
+SettingsCallbacks settingsCallbacks;
 
 class HeartbeatCallbacks : public NimBLECharacteristicCallbacks {
   void onWrite(NimBLECharacteristic* characteristic, NimBLEConnInfo&) override {
@@ -639,7 +702,7 @@ void RunDeckBle::begin() {
       kDeviceEventUuid, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY | NIMBLE_PROPERTY::WRITE);
   NimBLECharacteristic* settings = service->createCharacteristic(
       kSettingsUuid, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR);
-  settings->setCallbacks(&displayContextCallbacks);
+  settings->setCallbacks(&settingsCallbacks);
   NimBLECharacteristic* heartbeat = service->createCharacteristic(
       kHeartbeatUuid, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::NOTIFY);
   heartbeat->setCallbacks(&heartbeatCallbacks);

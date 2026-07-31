@@ -72,6 +72,10 @@ object RunDeckProtocol {
     private const val CONTEXT_KEY_WEATHER_STATE = 3
     private const val CONTEXT_KEY_TEMPERATURE_AVAILABLE = 4
     private const val CONTEXT_KEY_TEMPERATURE_OFFSET = 5
+    private const val SETTINGS_KEY_VERSION = 0
+    private const val SETTINGS_KEY_SEQUENCE = 1
+    private const val SETTINGS_KEY_MAX_FRAGMENT_BYTES = 2
+    private const val SETTINGS_KEY_MAX_NOTIFICATION_BYTES = 3
 
     fun encodeLiveMetrics(sequence: Int, sourceMonotonicMs: Long, metrics: LiveMetrics): ByteArray {
         require(sequence in 0..0xFFFF)
@@ -318,6 +322,18 @@ object RunDeckProtocol {
         output.writeUintEntry(CONTEXT_KEY_WEATHER_STATE, context.weatherState)
         output.writeBoolEntry(CONTEXT_KEY_TEMPERATURE_AVAILABLE, context.temperatureAvailable)
         output.writeUintEntry(CONTEXT_KEY_TEMPERATURE_OFFSET, context.temperatureF + 100)
+        return output.toByteArray().also { require(it.size <= MAX_DISPLAY_CONTEXT_BYTES) }
+    }
+
+    /** Negotiates the bounded binary limits used by the v1 notification path. */
+    fun encodeProtocolSettings(sequence: Int): ByteArray {
+        require(sequence in 0..0xFFFF)
+        val output = ByteArrayOutputStream()
+        output.write(0xA4)
+        output.writeUintEntry(SETTINGS_KEY_VERSION, VERSION.toInt())
+        output.writeUintEntry(SETTINGS_KEY_SEQUENCE, sequence)
+        output.writeUintEntry(SETTINGS_KEY_MAX_FRAGMENT_BYTES, NOTIFICATION_FRAGMENT_MAX_BYTES)
+        output.writeUintEntry(SETTINGS_KEY_MAX_NOTIFICATION_BYTES, MAX_NOTIFICATION_BYTES)
         return output.toByteArray().also { require(it.size <= MAX_DISPLAY_CONTEXT_BYTES) }
     }
 
