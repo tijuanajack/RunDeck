@@ -125,6 +125,11 @@ planned work.
 - Device Setup exposes a user-controlled BACKGROUND RUNS battery-optimization
   exemption flow. It must remain opt-in and must be rechecked after returning
   from Android Settings; never attempt to change the exemption silently.
+- Notification dismissal uses device-event type `0x54`: firmware sends the
+  Android notification sequence after a swipe-down, and Android maps it only
+  to an in-memory clearable notification key while the listener is connected.
+  Never persist notification content or keys, and never dismiss a source that
+  was not forwarded as clearable.
 - Media metadata is now Android-to-device over characteristic `0003` as a
   bounded ASCII CBOR packet sourced from active Android MediaSession
   controllers. The Android app has phone-side previous/play-pause/next buttons,

@@ -31,6 +31,10 @@ void onMediaControl(rundeck::MediaControlAction action, void*) {
 void onRunControl(rundeck::RunControlAction action, void*) {
   ble.notifyRunControl(action);
 }
+
+void onNotificationDismiss(uint16_t sequence, void*) {
+  ble.notifyNotificationDismissed(sequence);
+}
 }
 
 void setup() {
@@ -47,6 +51,7 @@ void setup() {
   dashboard.begin();
   dashboard.setMediaControlHandler(onMediaControl, nullptr);
   dashboard.setRunControlHandler(onRunControl, nullptr);
+  dashboard.setNotificationDismissHandler(onNotificationDismiss, nullptr);
   ble.begin();
 }
 

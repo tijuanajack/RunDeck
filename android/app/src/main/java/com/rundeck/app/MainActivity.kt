@@ -62,6 +62,7 @@ import com.rundeck.app.ble.DisplayContextPacket
 import com.rundeck.app.media.PhoneMediaController
 import com.rundeck.app.media.PhoneMediaState
 import com.rundeck.app.notifications.RunDeckNotificationBridge
+import com.rundeck.app.notifications.RunDeckNotificationListener
 import com.rundeck.app.notifications.RunDeckNotificationSettings
 import com.rundeck.app.notifications.RunDeckNotificationPreferences
 import com.rundeck.app.run.RunSession
@@ -130,6 +131,11 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
             RunDeckNotificationBridge.events.collect { payload ->
                 bleClient.publishNotification(payload)
                 delay(4_000L)
+            }
+        }
+        viewModelScope.launch {
+            bleClient.dismissedNotifications.collect { key ->
+                RunDeckNotificationListener.dismiss(key)
             }
         }
         viewModelScope.launch {

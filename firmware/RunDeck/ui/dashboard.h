@@ -15,6 +15,7 @@ class Dashboard {
   void render(const DisplayState& state);
   void setMediaControlHandler(void (*handler)(MediaControlAction, void*), void* context);
   void setRunControlHandler(void (*handler)(RunControlAction, void*), void* context);
+  void setNotificationDismissHandler(void (*handler)(uint16_t, void*), void* context);
 
  private:
   static void onGesture(lv_event_t* event);
@@ -27,6 +28,7 @@ class Dashboard {
 
   void emitMediaControl(MediaControlAction action);
   void emitRunControl(RunControlAction action);
+  void emitNotificationDismiss(uint16_t sequence);
 
   void show(Screen page);
   void buildDashboard();
@@ -75,6 +77,8 @@ class Dashboard {
   lv_obj_t* runPauseButton_ = nullptr;
   void (*runControlHandler_)(RunControlAction, void*) = nullptr;
   void* runControlContext_ = nullptr;
+  void (*notificationDismissHandler_)(uint16_t, void*) = nullptr;
+  void* notificationDismissContext_ = nullptr;
 };
 
 }  // namespace rundeck

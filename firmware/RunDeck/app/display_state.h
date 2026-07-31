@@ -34,6 +34,7 @@ struct DisplayState {
   const char* notificationApp;
   const char* notificationTitle;
   const char* notificationBody;
+  uint16_t notificationSequence;
   FreshValue weather;
   FreshValue clock;
   bool batteryAvailable;

@@ -20,6 +20,7 @@ constexpr uint8_t kLiveMetricsType = 1;
 constexpr uint8_t kDeviceEventAckType = 0x51;
 constexpr uint8_t kDeviceEventMediaControlType = 0x52;
 constexpr uint8_t kDeviceEventRunControlType = 0x53;
+constexpr uint8_t kDeviceEventNotificationDismissedType = 0x54;
 constexpr uint8_t kCommandRunState = 2;
 constexpr uint8_t kAckOk = 0;
 constexpr size_t kHeaderBytes = 12;
@@ -389,6 +390,22 @@ void notifyDeviceRunControl(RunControlAction action) {
   deviceEventCharacteristic->notify();
 }
 
+void notifyDeviceNotificationDismissed(uint16_t notificationSequence) {
+  if (!deviceEventCharacteristic || notificationSequence == 0) return;
+  const uint8_t payload[] = {
+      kProtocolVersion,
+      kDeviceEventNotificationDismissedType,
+      static_cast<uint8_t>(notificationSequence & 0xFF),
+      static_cast<uint8_t>(notificationSequence >> 8),
+      0,
+      0,
+      0,
+      0,
+  };
+  deviceEventCharacteristic->setValue(payload, sizeof(payload));
+  deviceEventCharacteristic->notify();
+}
+
 class LiveMetricsCallbacks : public NimBLECharacteristicCallbacks {
   void onWrite(NimBLECharacteristic* characteristic, NimBLEConnInfo&) override {
     const std::string value = characteristic->getValue();
@@ -618,6 +635,7 @@ void RunDeckBle::applyMediaState(DisplayState* state, uint32_t nowMs) {
 
 void RunDeckBle::applyNotificationState(DisplayState* state, uint32_t nowMs) {
   uint32_t receivedAt = 0;
+  uint16_t sequence = 0;
   bool valid = false;
   const char* app = "";
   const char* title = "";
@@ -625,6 +643,7 @@ void RunDeckBle::applyNotificationState(DisplayState* state, uint32_t nowMs) {
   portENTER_CRITICAL(&metricsMux);
   valid = haveNotification;
   receivedAt = notificationReceivedAtMs;
+  sequence = lastNotificationSequence;
   if (valid) {
     app = latestNotification.app;
     title = latestNotification.title;
@@ -634,6 +653,7 @@ void RunDeckBle::applyNotificationState(DisplayState* state, uint32_t nowMs) {
 
   const bool visible = valid && nowMs - receivedAt <= kNotificationVisibleForMs;
   state->notificationVisible = visible;
+  state->notificationSequence = valid ? sequence : 0;
   if (visible) {
     state->notificationApp = app;
     state->notificationTitle = title;
@@ -686,6 +706,10 @@ void RunDeckBle::notifyMediaControl(MediaControlAction action) {
 
 void RunDeckBle::notifyRunControl(RunControlAction action) {
   notifyDeviceRunControl(action);
+}
+
+void RunDeckBle::notifyNotificationDismissed(uint16_t notificationSequence) {
+  notifyDeviceNotificationDismissed(notificationSequence);
 }
 
 bool RunDeckBle::applyLiveMetrics(DisplayState* state, uint32_t nowMs) {

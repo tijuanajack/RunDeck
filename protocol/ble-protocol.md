@@ -122,6 +122,13 @@ shape as media controls. Actions are `4=Pause`, `5=Resume`, and `6=Stop`.
 Android dispatches accepted actions to the foreground run service; the device
 marks paused state on the next live-metrics packet.
 
+Device-origin notification-dismiss event (`event_type=0x54`) uses the same
+8-byte shape, with `sequence` set to the Android notification sequence and all
+remaining fields reserved zero. Android maps that bounded sequence to the
+in-memory clearable notification key and calls `cancelNotification` only while
+the user-enabled notification listener is connected; no notification content
+or key is persisted.
+
 In the current Android prototype, Android reads `0005` after a run-state write
 to retrieve the run-state ACK, and also subscribes to `0005` notifications for
 RunDeck Music-screen previous/play-pause/next taps. CCCD subscription and all

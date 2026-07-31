@@ -130,9 +130,8 @@ Last verified: 2026-07-30.
   selected-sources mode, source discovery for common installed message apps and
   observed notification packages, and local persistence. Android tests/build
   passed on 2026-07-31; the updated APK was installed and launched on the
-  attached Samsung after reconnecting ADB. Contact-level allowlisting,
-  Android-side dismissal acknowledgements, and fragmented long notifications
-  remain future work.
+  attached Samsung after reconnecting ADB. Contact-level allowlisting and
+  fragmented long notifications remain future work.
 - Device Setup usability checkpoint: the setup screen now scrolls on the
   phone, so the Messages card's ALL APPS / SELECTED controls and source rows
   are reachable on a full-height device. Android tests/build and install/launch
@@ -140,6 +139,11 @@ Last verified: 2026-07-30.
 - Notification end-to-end verification: the user confirmed a new test message
   appeared on RunDeck after selecting the message source. The phone listener,
   allowlist, BLE notification write, and device overlay are working together.
+- Notification dismissal checkpoint: RunDeck swipe-down now emits a bounded
+  `0005` `0x54` event containing the Android notification sequence. Android
+  keeps only a short in-memory sequence-to-clearable-key map and asks the
+  user-enabled notification listener to dismiss that source notification;
+  nothing is persisted and non-clearable notifications are never forwarded.
 - Environment context checkpoint: Android now formats local time and fetches
   current Fahrenheit temperature from Open-Meteo using the active GPS fix,
   caching it with a ten-minute refresh limit and explicit stale/unavailable
@@ -187,13 +191,12 @@ Last verified: 2026-07-30.
   Phone-side pause/resume/stop exists, Android-to-device media metadata is
   wired, device-origin Music-screen controls are wired, and device-origin
   run-control commands now have their first end-to-end slice. Notification
-  dismissal acknowledgements, settings, and heartbeat contracts are not
-  implemented end-to-end.
+  settings and heartbeat contracts are not implemented end-to-end.
 - Heart rate remains optional. Live phone-GPS runs display the Garmin strap as
   off/unavailable until an actual HR source is connected. Garmin HRM-Dual
   direct mode, concurrent central/peripheral soak testing, and phone-forwarded
   HR remain future work.
-- Notification dismissal acknowledgements and contact-level filtering,
+- Contact-level filtering,
   weather location before a run, touch lock, brightness/power work, and
   real-run outdoor validation remain future work. App-level message-source
   selection and 90-second duplicate suppression are implemented.
@@ -209,9 +212,8 @@ Last verified: 2026-07-30.
 2. Physically verify the new swipe-up Run Controls panel and device-origin
    pause/resume/stop, then polish tap-size/debounce issues found.
 3. On the Samsung, review the new BACKGROUND RUNS card and approve the
-   battery-optimization exemption before a screen-lock run test. Then polish
-   notifications with explicit dismissal acknowledgements and permitted
-   contact-level filtering, followed by touch lock/brightness and
+   battery-optimization exemption before a screen-lock run test. Then add
+   permitted contact-level filtering, followed by touch lock/brightness and
    outdoor/power validation.
 4. Add optional HR: phone-forwarded HR and target/combined pace-HR status
    rules first, then evaluate direct Garmin HRM-Dual only behind the

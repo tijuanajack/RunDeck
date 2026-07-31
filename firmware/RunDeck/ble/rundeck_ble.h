@@ -25,6 +25,8 @@ class RunDeckBle {
   void notifyMediaControl(MediaControlAction action);
   /** Sends a tapped run-control action to Android over device events. */
   void notifyRunControl(RunControlAction action);
+  /** Acknowledges a local notification dismissal using its Android sequence. */
+  void notifyNotificationDismissed(uint16_t notificationSequence);
   /** Returns true only when a fresh Android metrics frame was applied. */
   bool applyLiveMetrics(DisplayState* state, uint32_t nowMs);
 };

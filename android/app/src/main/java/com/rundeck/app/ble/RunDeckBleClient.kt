@@ -113,6 +113,9 @@ class RunDeckBleClient(context: Context) {
     val deviceMediaControls: SharedFlow<DeviceMediaControl> = _deviceMediaControls.asSharedFlow()
     private val _deviceRunControls = MutableSharedFlow<DeviceRunControl>(extraBufferCapacity = 8)
     val deviceRunControls: SharedFlow<DeviceRunControl> = _deviceRunControls.asSharedFlow()
+    private val _dismissedNotifications = MutableSharedFlow<String>(extraBufferCapacity = 8)
+    val dismissedNotifications: SharedFlow<String> = _dismissedNotifications.asSharedFlow()
+    private val notificationKeys = linkedMapOf<Int, String>()
 
     private val reconnectRunnable = Runnable { reconnectRememberedDevice() }
 
@@ -314,8 +317,11 @@ class RunDeckBleClient(context: Context) {
 
     fun publishNotification(payload: RunDeckNotificationPayload) {
         val characteristic = notificationPayload ?: return
+        val nextSequence = sequence.getAndIncrement() and 0xFFFF
+        notificationKeys[nextSequence] = payload.notificationKey
+        while (notificationKeys.size > 16) notificationKeys.remove(notificationKeys.entries.first().key)
         val frame = RunDeckProtocol.encodeNotification(
-            sequence.getAndIncrement() and 0xFFFF,
+            nextSequence,
             NotificationPacket(payload.app, payload.title, payload.body),
         )
         queueWrite(characteristic, frame, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT, OP_NOTIFICATION)
@@ -543,6 +549,9 @@ class RunDeckBleClient(context: Context) {
                     }
                     if (control != null) _deviceRunControls.tryEmit(control)
                 }
+                if (event is DeviceEvent.NotificationDismissed) {
+                    notificationKeys.remove(event.sequence)?.let(_dismissedNotifications::tryEmit)
+                }
             }
             .onFailure {
                 _bridge.value = _bridge.value.copy(lastError = "BAD DEVICE EVENT")
@@ -563,6 +572,7 @@ class RunDeckBleClient(context: Context) {
         notificationPayload = null
         displayContext = null
         deviceEvents = null
+        notificationKeys.clear()
         pendingGattOps.clear()
         gattOperationInFlight = false
         protocolStarted = false

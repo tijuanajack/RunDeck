@@ -20,6 +20,7 @@ object RunDeckProtocol {
     const val DEVICE_EVENT_ACK_TYPE: Byte = 0x51
     const val DEVICE_EVENT_MEDIA_CONTROL_TYPE: Byte = 0x52
     const val DEVICE_EVENT_RUN_CONTROL_TYPE: Byte = 0x53
+    const val DEVICE_EVENT_NOTIFICATION_DISMISSED_TYPE: Byte = 0x54
     const val COMMAND_RUN_STATE: Byte = 2
     const val MEDIA_CONTROL_PREVIOUS: Byte = 1
     const val MEDIA_CONTROL_PLAY_PAUSE: Byte = 2
@@ -133,6 +134,12 @@ object RunDeckProtocol {
                 require(input.short.toInt() == 0) { "Unsupported run-control extension" }
                 require(action in RUN_CONTROL_PAUSE..RUN_CONTROL_STOP) { "Unknown run-control action" }
                 DeviceEvent.RunControl(sequence, action)
+            }
+            DEVICE_EVENT_NOTIFICATION_DISMISSED_TYPE -> {
+                val sequence = input.short.toInt() and 0xFFFF
+                require(input.short.toInt() == 0) { "Unsupported notification-dismiss extension" }
+                require(input.short.toInt() == 0) { "Unsupported notification-dismiss extension" }
+                DeviceEvent.NotificationDismissed(sequence)
             }
             else -> error("Unknown device event type $type")
         }
@@ -374,6 +381,7 @@ sealed interface DeviceEvent {
     data class Ack(val acknowledgedSequence: Int, val commandType: Byte, val status: Byte) : DeviceEvent
     data class MediaControl(val sequence: Int, val action: Byte) : DeviceEvent
     data class RunControl(val sequence: Int, val action: Byte) : DeviceEvent
+    data class NotificationDismissed(val sequence: Int) : DeviceEvent
 }
 
 data class RunStatePacket(

@@ -130,4 +130,19 @@ class RunDeckProtocolTest {
 
         assertEquals(DeviceEvent.RunControl(44, RunDeckProtocol.RUN_CONTROL_PAUSE), event)
     }
+
+    @Test fun `device notification dismiss event decodes notification sequence`() {
+        val event = RunDeckProtocol.decodeDeviceEvent(byteArrayOf(
+            1,
+            RunDeckProtocol.DEVICE_EVENT_NOTIFICATION_DISMISSED_TYPE,
+            0x2D,
+            0x00,
+            0,
+            0,
+            0,
+            0,
+        ))
+
+        assertEquals(DeviceEvent.NotificationDismissed(45), event)
+    }
 }

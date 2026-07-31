@@ -90,6 +90,7 @@ void Dashboard::onGesture(lv_event_t* event) {
   if (self->notification_ && !lv_obj_has_flag(self->notification_, LV_OBJ_FLAG_HIDDEN)) {
     if (direction == LV_DIR_BOTTOM) {
       self->notificationDismissed_ = true;
+      self->emitNotificationDismiss(self->state_.notificationSequence);
       lv_obj_add_flag(self->notification_, LV_OBJ_FLAG_HIDDEN);
     }
     return;
@@ -150,6 +151,17 @@ void Dashboard::emitMediaControl(MediaControlAction action) {
 void Dashboard::setRunControlHandler(void (*handler)(RunControlAction, void*), void* context) {
   runControlHandler_ = handler;
   runControlContext_ = context;
+}
+
+void Dashboard::setNotificationDismissHandler(void (*handler)(uint16_t, void*), void* context) {
+  notificationDismissHandler_ = handler;
+  notificationDismissContext_ = context;
+}
+
+void Dashboard::emitNotificationDismiss(uint16_t sequence) {
+  if (notificationDismissHandler_ && sequence != 0) {
+    notificationDismissHandler_(sequence, notificationDismissContext_);
+  }
 }
 
 void Dashboard::emitRunControl(RunControlAction action) {

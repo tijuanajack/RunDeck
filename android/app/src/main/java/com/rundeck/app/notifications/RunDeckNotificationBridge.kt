@@ -13,6 +13,8 @@ data class RunDeckNotificationPayload(
     val app: String,
     val title: String,
     val body: String,
+    /** System notification key; retained only in memory for permitted dismissal. */
+    val notificationKey: String,
 )
 
 object RunDeckNotificationBridge {
@@ -46,6 +48,7 @@ object RunDeckNotificationBridge {
                     app = app,
                     title = candidate.title,
                     body = candidate.body,
+                    notificationKey = sbn.key,
                 ),
             )
         }
