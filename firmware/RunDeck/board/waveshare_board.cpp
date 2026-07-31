@@ -208,7 +208,14 @@ void applyPendingDisplayBrightness() {
   if (!panelIo || !brightnessPending) return;
   const uint8_t value = brightnessPendingLevel;
   brightnessPending = false;
-  const bool ok = esp_lcd_panel_io_tx_param(panelIo, 0x51, &value, 1) == ESP_OK;
+  // SH8601's QSPI panel IO expects the command word in the same encoded form
+  // used by the vendor driver: opcode 0x02 (write command), followed by the
+  // 8-bit DCS command in bits 15..8. Sending raw 0x51 is accepted by the
+  // transport but is not a valid QSPI command frame, so the panel ignores it.
+  constexpr uint32_t kQspiWriteCommand = 0x02u << 24;
+  constexpr uint32_t kDcsWriteBrightness = 0x51u << 8;
+  const uint32_t command = kQspiWriteCommand | kDcsWriteBrightness;
+  const bool ok = esp_lcd_panel_io_tx_param(panelIo, command, &value, 1) == ESP_OK;
   Serial.printf("RunDeck brightness %u (%s)\n", value, ok ? "sent" : "failed");
 }
 
