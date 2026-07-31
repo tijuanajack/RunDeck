@@ -127,6 +127,9 @@ planned work.
   controllers. The Android app has phone-side previous/play-pause/next buttons,
   but RunDeck-device-origin media controls are still future work and should be
   implemented before device-origin run controls per the user's latest order.
+  Keep display-bound media strings backed by persistent storage, not local
+  decoded packet copies; the temporary-copy bug caused random characters under
+  the song title.
 - Device-event `0005` currently exposes run-state ACK as an 8-byte compact
   event. Android reads `0005` after the run-state write completes and shows
   `PRESET ACCEPTED`. Android now serializes GATT writes/reads through an

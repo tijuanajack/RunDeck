@@ -98,6 +98,10 @@ Last verified: 2026-07-30.
   the previous hardcoded mock. Android tests/build passed; APK install/launch
   passed; firmware compile and flash to the verified Espressif port were
   hash-verified on 2026-07-30.
+- Music metadata bugfix: the firmware media renderer now points at the
+  persistent stored media buffers instead of a temporary decoded copy. This
+  fixes random characters under the song title. Firmware compile and flash to
+  `/dev/ttyACM0` were hash-verified on 2026-07-30.
 - The selected V1 Long Run target is 8:50–9:20 /mi. Android derives
   `ON TARGET`, `EASE OFF`, `PICK IT UP`, or `GPS WEAK` and sends that state to
   the display. Active-run distance, elapsed time, and pace are checkpointed

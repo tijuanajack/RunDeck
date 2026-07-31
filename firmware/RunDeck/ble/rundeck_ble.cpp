@@ -386,13 +386,23 @@ void RunDeckBle::applyRunState(DisplayState* state, uint32_t nowMs) {
 }
 
 void RunDeckBle::applyMediaState(DisplayState* state, uint32_t nowMs) {
-  MediaConfig media{};
   uint32_t receivedAt = 0;
   bool valid = false;
+  bool available = false;
+  bool playing = false;
+  const char* source = "PHONE";
+  const char* title = "NO MEDIA";
+  const char* artist = "";
   portENTER_CRITICAL(&metricsMux);
   valid = haveMedia;
-  media = latestMedia;
   receivedAt = mediaReceivedAtMs;
+  if (valid) {
+    available = latestMedia.available;
+    playing = latestMedia.playing;
+    source = latestMedia.source;
+    title = latestMedia.title;
+    artist = latestMedia.artist;
+  }
   portEXIT_CRITICAL(&metricsMux);
 
   if (!valid) {
@@ -405,13 +415,13 @@ void RunDeckBle::applyMediaState(DisplayState* state, uint32_t nowMs) {
   }
 
   const bool fresh = nowMs - receivedAt <= kMediaFreshForMs;
-  state->media = {fresh ? (media.available ? SourceState::Connected : SourceState::Unavailable)
+  state->media = {fresh ? (available ? SourceState::Connected : SourceState::Unavailable)
                         : SourceState::Stale,
                   receivedAt};
-  state->mediaPlaying = fresh && media.available && media.playing;
-  state->mediaSource = fresh ? media.source : "PHONE";
-  state->mediaTitle = fresh ? (media.available ? media.title : "NO MEDIA") : "MEDIA STALE";
-  state->mediaArtist = fresh ? media.artist : "";
+  state->mediaPlaying = fresh && available && playing;
+  state->mediaSource = fresh ? source : "PHONE";
+  state->mediaTitle = fresh ? (available ? title : "NO MEDIA") : "MEDIA STALE";
+  state->mediaArtist = fresh ? artist : "";
 }
 
 bool RunDeckBle::applyLiveMetrics(DisplayState* state, uint32_t nowMs) {
