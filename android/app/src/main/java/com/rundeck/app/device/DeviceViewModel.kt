@@ -20,6 +20,8 @@ import com.rundeck.app.run.HrOwnershipMode
 import com.rundeck.app.run.HrOwnershipPreferences
 import com.rundeck.app.weather.OpenMeteoWeather
 import com.rundeck.app.weather.WeatherSnapshot
+import com.rundeck.app.hr.HeartRateClient
+import com.rundeck.app.hr.HeartRateDevice
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.isActive
@@ -38,6 +40,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     private val checkpoints = RunCheckpointStore(application)
     private val mediaController = PhoneMediaController(application)
     private val weatherProvider = OpenMeteoWeather()
+    private val heartRateClient = HeartRateClient(application)
 
     val devices = bleClient.devices
     val connection = bleClient.connection
@@ -45,6 +48,8 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     val media = mediaController.state
     val notifications = RunDeckNotificationPreferences.settings
     val hrOwnership = HrOwnershipPreferences.mode
+    val heartRateDevices = heartRateClient.devices
+    val heartRate = heartRateClient.state
 
     init {
         RunDeckNotificationPreferences.initialize(application)
@@ -55,6 +60,13 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
         }
         viewModelScope.launch {
             hrOwnership.collectLatest(bleClient::setHrOwnershipMode)
+        }
+        viewModelScope.launch {
+            heartRate.collectLatest { source ->
+                val current = RunSession.state.value
+                if (!current.active || hrOwnership.value != HrOwnershipMode.PhoneForwardedHr) return@collectLatest
+                RunSession.update(current.copy(heartRateBpm = source.bpm, heartRateStatus = source.status))
+            }
         }
         viewModelScope.launch {
             media.collectLatest(bleClient::publishMediaState)
@@ -138,9 +150,12 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     fun setNotificationContactAllowed(packageName: String, sender: String, allowed: Boolean) =
         RunDeckNotificationPreferences.setContactAllowed(getApplication(), packageName, sender, allowed)
     fun setHrOwnershipMode(mode: HrOwnershipMode) = HrOwnershipPreferences.set(getApplication(), mode)
+    fun scanHeartRate() = heartRateClient.scan()
+    fun connectHeartRate(device: HeartRateDevice) = heartRateClient.connect(device)
 
     override fun onCleared() {
         mediaController.close()
         bleClient.close()
+        heartRateClient.close()
     }
 }

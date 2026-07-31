@@ -56,6 +56,7 @@ import com.rundeck.app.media.PhoneMediaState
 import com.rundeck.app.notifications.RunDeckNotificationSettings
 import com.rundeck.app.device.DeviceViewModel
 import com.rundeck.app.run.HrOwnershipMode
+import com.rundeck.app.hr.HeartRateDevice
 import com.rundeck.app.run.RunSession
 import com.rundeck.app.run.RunTrackingService
 import com.rundeck.app.run.LongRunTarget
@@ -80,6 +81,8 @@ private fun RunDeckApp(viewModel: DeviceViewModel = viewModel()) {
     val media by viewModel.media.collectAsState()
     val notifications by viewModel.notifications.collectAsState()
     val hrOwnership by viewModel.hrOwnership.collectAsState()
+    val heartRateDevices by viewModel.heartRateDevices.collectAsState()
+    val heartRate by viewModel.heartRate.collectAsState()
     val run by RunSession.state.collectAsState()
     var showRunSetup by remember { mutableStateOf(false) }
     var checkpoint by remember { mutableStateOf<com.rundeck.app.run.RunUiState?>(null) }
@@ -178,6 +181,10 @@ private fun RunDeckApp(viewModel: DeviceViewModel = viewModel()) {
                     onNotificationContactAllowed = viewModel::setNotificationContactAllowed,
                     hrOwnership = hrOwnership,
                     onHrOwnershipMode = viewModel::setHrOwnershipMode,
+                    heartRate = heartRate,
+                    heartRateDevices = heartRateDevices,
+                    onScanHeartRate = viewModel::scanHeartRate,
+                    onConnectHeartRate = viewModel::connectHeartRate,
                     backgroundRunAllowed = backgroundRunAllowed,
                     onAllowBackgroundRuns = {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {

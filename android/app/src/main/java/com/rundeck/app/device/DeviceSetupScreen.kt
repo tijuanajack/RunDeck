@@ -31,6 +31,8 @@ import com.rundeck.app.ble.DiscoveredRunDeck
 import com.rundeck.app.media.PhoneMediaState
 import com.rundeck.app.notifications.RunDeckNotificationSettings
 import com.rundeck.app.run.HrOwnershipMode
+import com.rundeck.app.hr.HeartRateDevice
+import com.rundeck.app.hr.HeartRateState
 import com.rundeck.app.ui.Amber
 import com.rundeck.app.ui.Black
 import com.rundeck.app.ui.BrandHeader
@@ -62,6 +64,10 @@ fun DeviceSetupScreen(
     onNotificationContactAllowed: (String, String, Boolean) -> Unit,
     hrOwnership: HrOwnershipMode,
     onHrOwnershipMode: (HrOwnershipMode) -> Unit,
+    heartRate: HeartRateState,
+    heartRateDevices: List<HeartRateDevice>,
+    onScanHeartRate: () -> Unit,
+    onConnectHeartRate: (HeartRateDevice) -> Unit,
     backgroundRunAllowed: Boolean,
     onAllowBackgroundRuns: () -> Unit,
 ) = Column(
@@ -85,9 +91,35 @@ fun DeviceSetupScreen(
     ResilienceCard(backgroundRunAllowed, onAllowBackgroundRuns)
     Spacer(Modifier.height(14.dp))
     HrModeCard(hrOwnership, onHrOwnershipMode)
+    Spacer(Modifier.height(14.dp))
+    HeartRateCard(heartRate, heartRateDevices, onScanHeartRate, onConnectHeartRate)
     if (connection is DeviceConnection.Ready) {
         Spacer(Modifier.height(24.dp))
         PrimaryButton("CONTINUE TO RUN SETUP", onContinue)
+    }
+}
+
+@Composable
+private fun HeartRateCard(state: HeartRateState, devices: List<HeartRateDevice>, onScan: () -> Unit, onConnect: (HeartRateDevice) -> Unit) = Column(Modifier.fillMaxWidth().background(Color(0xFF080A0D), RoundedCornerShape(16.dp)).padding(18.dp)) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        androidx.compose.material3.Text("HR STRAP", color = Color(0xFFFF5252), fontSize = 13.sp, letterSpacing = 2.sp)
+        androidx.compose.material3.Text(state.status, color = if (state.connected) Lime else Muted, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+    }
+    Spacer(Modifier.height(8.dp))
+    androidx.compose.material3.Text(state.bpm?.let { "$it BPM" } ?: "No heart-rate reading", color = White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+    Spacer(Modifier.height(10.dp))
+    PrimaryButton("SCAN HR STRAPS", onScan)
+    if (devices.isNotEmpty()) {
+        Spacer(Modifier.height(8.dp))
+        devices.forEach { device ->
+            Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Column(Modifier.weight(1f)) {
+                    androidx.compose.material3.Text(device.name, color = White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    androidx.compose.material3.Text(device.address, color = Muted, fontSize = 11.sp)
+                }
+                Button(onClick = { onConnect(device) }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF14232A), contentColor = White), modifier = Modifier.width(100.dp).height(38.dp), shape = RoundedCornerShape(10.dp)) { androidx.compose.material3.Text("CONNECT", fontWeight = FontWeight.Black, fontSize = 11.sp) }
+            }
+        }
     }
 }
 

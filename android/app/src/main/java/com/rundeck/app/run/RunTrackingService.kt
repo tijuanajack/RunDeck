@@ -126,7 +126,9 @@ class RunTrackingService : Service(), LocationListener {
         val movingSeconds = ((now - startedAtMs - accumulatedPausedMs) / 1_000L).coerceAtLeast(0)
         val next = RunUiState(active = true, paused = false, elapsedSeconds = elapsedSeconds,
             movingSeconds = movingSeconds, distanceMeters = distanceMeters, paceSecondsPerMile = pace,
-            gpsStatus = "GPS LIVE", latitude = location.latitude, longitude = location.longitude)
+            gpsStatus = "GPS LIVE", heartRateBpm = RunSession.state.value.heartRateBpm,
+            heartRateStatus = RunSession.state.value.heartRateStatus,
+            latitude = location.latitude, longitude = location.longitude)
         publish(next)
         updateNotification(next)
     }

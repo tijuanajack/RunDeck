@@ -167,6 +167,11 @@ Last verified: 2026-07-30.
   while high HR plus fast pace yields `EASE OFF`. The corresponding live-metric
   flags and Stats/dashboard labels are implemented and the firmware flashed
   with a verified hash on 2026-07-31.
+- Phone-forwarded HR checkpoint: Android now scans the standard Heart Rate
+  Service (`0x180D`), subscribes to Heart Rate Measurement (`0x2A37`), parses
+  8/16-bit measurements, stores only the selected strap address, and retries
+  reconnects with a bounded backoff. The source remains opt-in through the HR
+  ownership selector and unavailable readings clear to `GARMIN STRAP OFF`.
 - Environment context checkpoint: Android now formats local time and fetches
   current Fahrenheit temperature from Open-Meteo using the active GPS fix,
   caching it with a ten-minute refresh limit and explicit stale/unavailable
@@ -220,7 +225,8 @@ Last verified: 2026-07-30.
   off/unavailable until an actual HR source is connected. Garmin HRM-Dual
   direct mode, concurrent central/peripheral soak testing, and a real
   phone-forwarded HR source remain future work; the ownership selector and
-  safe packet gating are now in place.
+  safe packet gating are now in place. Physical strap pairing and a real HR
+  run are the next verification gate.
 - Fragmented long notifications,
   weather location before a run, touch lock, brightness/power work, and
   real-run outdoor validation remain future work. App-level message-source
