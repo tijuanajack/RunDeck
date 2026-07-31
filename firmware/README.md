@@ -13,15 +13,14 @@ arduino-cli lib install NimBLE-Arduino@2.5.1
 ./tools/fetch-waveshare-bsp.sh
 ```
 
-Run the fetched `09_LVGL_Test` unchanged first. Its result establishes panel,
-touch, rotation, and USB serial behavior. Only then copy/adapt the vendor
-`esp_lcd_sh8601.*` and `esp_lcd_touch*` files into `RunDeck/vendor/` as
-described by the script output.
+The downloaded legacy `09_LVGL_Test` is retained as a historical diagnostic;
+on this board it uploaded but left the panel black. The working RunDeck build
+uses the newer Waveshare V2 reset sequence: TCA9554 EXIO0 resets the SH8601
+OLED, EXIO1 resets touch, and the direct GPIO21 LCD reset is disabled.
 
 The implementation is intentionally split by responsibility: `app/` holds the
 display state and simulated source, `ui/` owns view construction, and `board/`
-will own the board adapter after validation. `RunDeck.ino` is only the
-composition root.
+owns the verified board adapter. `RunDeck.ino` is only the composition root.
 
 ## Flashing
 
@@ -41,5 +40,5 @@ selection. It compiles the same source immediately before upload.
 The display advertises as `RunDeck` with the versioned service specified in
 `protocol/ble-protocol.md`. The Android companion filters for that service and
 writes validated live-metrics frames at 1 Hz. Until a valid frame arrives the
-dashboard uses simulated values; incoming values expire after five seconds and
-never appear live once stale.
+display shows connection/unavailable states; incoming values expire after five
+seconds and never appear live once stale.

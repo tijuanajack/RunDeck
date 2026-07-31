@@ -32,29 +32,20 @@ blindly flash another firmware build.
 
 4. **Stop and inspect the board.** Confirm the factory display appears, touch
    responds where applicable, and it still boots after one USB unplug/replug.
-   If this fails, do not flash RunDeck again: record the behavior, cable/power
-   source, and serial output first.
+   If this fails, record the behavior, cable/power source, and serial output
+   before attempting another image.
 
-5. Do **not** flash the Arduino RunDeck build yet: on this board the generic
-   vendor Arduino and ESP-IDF images both hash-verify yet leave the panel
-   black. A header-matched FactoryProgram build also fails after a true cold
-   boot. Capture serial cold-boot logs and compare runtime initialization
-   before attempting another firmware candidate.
-
-   The captured failure is a stale FactoryProgram touch path that passes a
-   nonzero `scl_speed_hz` into a legacy I2C panel adapter. The factory binary
-   uses the newer direct FT5x06 API. Lock a compatible BSP/component revision
-   before attempting a replacement build.
-
-6. Only after that configuration passes three cold boots, compile and flash
-   the current source to the same confirmed Espressif port.
+5. The working RunDeck image uses the Waveshare V2 TCA9554 reset sequence:
+   EXIO0 resets the SH8601 OLED, EXIO1 resets touch, and direct GPIO21 LCD
+   reset remains disabled. Compile and flash only this known-good path unless
+   intentionally testing a new display candidate.
 
    ```sh
    cd firmware
    sg dialout -c '/home/tjhurt/.local/bin/arduino-cli compile --fqbn esp32:esp32:waveshare_esp32_s3_touch_amoled_241 RunDeck --output-dir build && /home/tjhurt/.local/bin/arduino-cli upload --fqbn esp32:esp32:waveshare_esp32_s3_touch_amoled_241 --port /dev/ttyACM0 RunDeck'
    ```
 
-7. Verify RunDeck while USB-powered, then cold-boot it three times (unplug for
+6. Verify RunDeck while USB-powered, then cold-boot it three times (unplug for
    five seconds, reconnect, wait up to 15 seconds). Test BLE only after all
    three cold boots show the display. A release is not considered stable until
    it passes this gate.

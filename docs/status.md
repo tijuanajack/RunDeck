@@ -1,11 +1,12 @@
 # Implementation status
 
-Last verified: 2026-07-30.
+Last verified: 2026-07-31.
 
 ## Current hardware gate
 
-- The board is restored to its factory image, which cold-boots correctly with
-  a replacement known-good data cable.
+- The factory recovery image is preserved and cold-boots correctly with a
+  replacement known-good data cable; the current RunDeck image is the shipped
+  application image.
 - Earlier downloaded Waveshare examples were stale for this board revision:
   the old Arduino and ESP-IDF LVGL tests uploaded and hash-verified but left
   the panel black. The current Waveshare V2 Arduino example shows the missing
@@ -21,8 +22,8 @@ Last verified: 2026-07-30.
   display.
 - The factory image bootloader and partition table differ from the Arduino
   output. The Arduino RunDeck BSP now contains the V2 TCA9554 reset sequence;
-  continue to verify physical cold boots before adding more hardware
-  complexity.
+  use the recovery gate before any future display, reset, partition, or power
+  change.
 
 ## Working and verified
 
@@ -52,8 +53,7 @@ Last verified: 2026-07-30.
   bridge status, unit tests cover the status labels, and firmware renders
   absent HR as `--` / `GARMIN STRAP OFF` instead of `0 BPM` or a simulated
   in-zone value. The firmware build and flash were hash-verified on
-  2026-07-30; the Android APK built successfully but was not installed because
-  no phone was visible to ADB at that moment.
+  2026-07-31; the APK was subsequently installed and launched on the Samsung.
 - Run-state/preset protocol checkpoint: Android encodes a bounded CBOR
   run-state packet for characteristic `7b2e0002-...` and sends the Long Run
   preset, ASCII target label, active flag, pace bounds, and optional HR bounds
@@ -61,8 +61,7 @@ Last verified: 2026-07-30.
   rejects replayed/malformed/out-of-range payloads, and renders the
   Android-owned `targetLabel` instead of hardcoding `8:50-9:20`. Android unit
   tests and `assembleDebug` passed; firmware compile and flash were
-  hash-verified on 2026-07-30. The updated Android APK still needs installation
-  when the phone is visible to ADB.
+  hash-verified; the APK was installed and launched on the Samsung.
 - Post-install bugfix checkpoint: user reported the Android-owned target label
   rendered as random symbols and pace did not match the phone while distance
   and elapsed time did. Firmware now uses the persistent stored run-state
@@ -108,8 +107,8 @@ Last verified: 2026-07-30.
   PLAY/PAUSE, and NEXT panels are clickable and notify Android, which dispatches
   them to the active MediaSession. Android tests/build passed, APK
   install/launch passed, and firmware compile/flash to `/dev/ttyACM0` were
-  hash-verified on 2026-07-30. User still needs to confirm taps on the RunDeck
-  screen control the phone.
+  hash-verified. RunDeck Music PREV, PLAY/PAUSE, and NEXT taps were confirmed
+  to control the phone.
 - Music display polish: long song titles now use LVGL circular horizontal
   scrolling instead of dot truncation, and the firmware keeps the last known
   title/artist visible when MediaSession metadata ages instead of replacing it
@@ -208,7 +207,8 @@ Last verified: 2026-07-30.
   advertisements that expose the standard Heart Rate Service, uses one shared
   8/16-bit `0x2A37` decoder with bounds checks, and has unit coverage for valid,
   malformed, and implausible measurements. APK build/install/launch passed on
-  2026-07-31; a physical strap connection test is still required.
+  2026-07-31; a physical strap connection is optional validation because
+  direct-device HR is intentionally disabled for V1.
 - Direct-device HR checkpoint: firmware contains a standard `0x180D` /
   `0x2A37` NimBLE central client with bounded scan/reconnect and stale clearing,
   but the soak image disrupted RunDeck discovery. The current firmware gate is
@@ -234,7 +234,7 @@ Last verified: 2026-07-30.
   the AMOLED off after 60 seconds without touch activity. Touch wakes it, and
   an active run keeps the display awake. This uses the panel driver's display
   on/off operation only; the verified reset and battery-power paths are not
-  changed. Physical timeout/wake testing is still required.
+  changed. Long-duration timeout/wake remains operational validation.
 - Environment context checkpoint: Android now formats local time and fetches
   current Fahrenheit temperature from Open-Meteo using the active GPS fix,
   caching it with a ten-minute refresh limit and explicit stale/unavailable
@@ -262,83 +262,46 @@ Last verified: 2026-07-30.
   carried in live-metrics flags. The Stats screen now renders live pace,
   average pace, speed, HR, distance, elapsed, temperature, and status instead
   of its original mock values. Firmware compile/flash and Android tests/build
-  passed on 2026-07-31; phone APK installation remains pending until ADB sees
-  the Samsung.
+  passed on 2026-07-31; the APK was installed and launched on the Samsung.
 - The selected V1 Long Run target is 8:50–9:20 /mi. Android derives
   `ON TARGET`, `EASE OFF`, `PICK IT UP`, or `GPS WEAK` and sends that state to
   the display. Active-run distance, elapsed time, and pace are checkpointed
   locally with DataStore; stopping the run clears the checkpoint.
+- Final V1 boot/navigation checkpoint: RunDeck holds the branded splash until a
+  phone protocol packet arrives, lands on `READY TO RUN`, exposes idle swipes
+  through Music, Stats, and device-local Display Brightness, starts from either
+  phone or RunDeck, shows the live Dashboard, and returns to Ready after stop.
+  The user verified the RunDeck START RUN path end-to-end on the Samsung.
+- Android 16 device-start fix: the app now brings its Activity visibly forward
+  before starting the location foreground service from a device-origin start;
+  rejected starts are handled without crashing. The corrected APK was
+  installed and the device-origin start was verified on the Samsung.
 - A full 16 MB pre-RunDeck recovery image exists locally at
   `firmware/backups/factory-before-rundeck.bin` and is intentionally ignored by
   Git.
 
-## Current limitations (do not misrepresent as complete)
+## Future work and validation
 
-- The Android app is still a compact single-module prototype. Hilt, Room,
+- The Android app remains a compact single-module prototype. Hilt, Room,
   Gradle feature modules, full preset editing, and production-grade checkpoint
-  recovery are not implemented. The first device feature boundary is now in
-  place without changing the working BLE contract.
-- The device currently receives live metrics and the first bounded CBOR
-  run-state/preset packet, and Android can read back the first run-state ACK.
-  Phone-side pause/resume/stop exists, Android-to-device media metadata is
-  wired, device-origin Music-screen controls are wired, and device-origin
-  run-control commands now have their first end-to-end slice. The v1 heartbeat
-  is now sent every 10 seconds and validated on the device for version,
-  reserved bytes, sequence, and monotonic source time. Notification
-  fragmentation is complete, and the `0006` settings handshake now validates
-  and acknowledges the negotiated fragment/notification limits before context
-  updates.
-- Display brightness checkpoint: Android now persists NIGHT, NORMAL, BRIGHT,
-  or MAX brightness and sends the selected level through the acknowledged
-  settings packet. Firmware applies it through the SH8601 `0x51` command only
-  after the verified panel initialization path completes.
-- Final V1 boot/navigation checkpoint: RunDeck now holds the branded splash
-  until a phone protocol packet arrives, lands on the connected `READY TO RUN`
-  page, and exposes idle-page swipes through Music, Stats, and a device-local
-  `DISPLAY BRIGHTNESS` page. The large device `START RUN` control sends a
-  versioned `0005` start event to Android; the device enters the existing live
-  Dashboard only after Android starts the foreground run and publishes active
-  state. Phone- or device-origin stop returns the device to `READY TO RUN`,
-  while active-run swipes remain limited to Dashboard/Music/Stats/Brightness.
-  The Android protocol decoder, device-event routing, firmware compile, and
-  Android unit/build checks pass. Physical start/stop and brightness taps still
-  require the final smoke test.
-- Android 16 device-start fix: starting a location foreground service directly
-  from the BLE callback caused a Samsung `SecurityException` and app crash.
-  Device-origin start now brings the Activity to the foreground before starting
-  the service, and the service safely handles any rejected launch. The APK was
-  rebuilt and installed; the user verified that tapping `START RUN` on RunDeck
-  now starts the phone run and reaches the live Dashboard.
+  recovery are future architecture work, not V1 blockers.
 - Heart rate remains optional. Live phone-GPS runs display the Garmin strap as
   off/unavailable until an actual HR source is connected. Phone-forwarded HR
   is implemented and parser/discovery-tested. Garmin HRM-Dual direct mode and
   concurrent central/peripheral soak testing remain future work; the direct
   firmware gate stays disabled until that reliability test passes.
-- Brightness/power work and
-  real-run outdoor validation remain future work. Setup now offers a
-  permission-gated recent-phone-location weather seed; the provider still
-  refreshes at most every ten minutes and marks stale results. The setup card
-  reports whether permission is already granted, a recent fix is available, or
-  a fresh fix is needed. App-level message-source
-  selection and 90-second duplicate suppression are implemented.
+- Hardware validation remains ongoing: repeat the three-cold-boot gate after
+  future hardware changes, calibrate USB-only and LiPo ADC readings, and
+  measure power before making battery-life claims. Outdoor sunlight, sweat,
+  screen-lock, and long-duration timeout testing are operational validation,
+  not unimplemented V1 features.
 - The scripted flash helper deliberately refuses to choose between multiple
   serial ports. When the phone is also attached, identify the Espressif USB
   JTAG port via `udevadm` and use that explicit port.
 
-## Next implementation order
+## Explicitly deferred ideas
 
-1. Re-run the full-UI cold-boot gate three times and verify the new saved-device
-   reconnect path when the user can physically test it.
-   Restore factory immediately on any failed cold boot.
-2. Physically verify the new swipe-up Run Controls panel and device-origin
-   pause/resume/stop, then polish tap-size/debounce issues found.
-3. On the Samsung, review the new BACKGROUND RUNS card and approve the
-   battery-optimization exemption before a screen-lock run test. Then add
-   permitted contact-level filtering, followed by brightness/power and
-   outdoor validation. The device touch lock is now a compact yellow control
-   below the dashboard HR target; it unlocks only with an up-then-down
-   gesture.
-4. Add optional HR: phone-forwarded HR and target/combined pace-HR status
-   rules first, then evaluate direct Garmin HRM-Dual only behind the
-   BLE-concurrency soak gate. The strap must be treated as absent when not
-   worn/connected.
+Direct-device Garmin HRM-Dual concurrency, Hilt/Room/feature-module
+reorganization, full preset editing, cloud sync, maps, ski mode, Bowline/Garmin
+cloud integrations, iOS, HRV, structured workouts, voice reply, and any
+production battery-life claim remain outside V1.

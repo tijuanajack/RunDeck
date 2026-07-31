@@ -4,10 +4,16 @@ Android owns run timing, GPS, pace, distance, weather, presets, media, and
 notifications. The ESP32 owns display/touch state and, in direct mode, the HR
 strap connection. The device keeps only reconnection and display preferences.
 
-`RunRepository` feeds a foreground-service state flow. `BleDeviceRepository`
+`RunTrackingService` publishes the `RunSession` state flow. `RunDeckBleClient`
 maps that state to the versioned RunDeck protocol. Firmware decodes it into an
 immutable `DisplayState`; each producer includes a freshness timestamp and
 state. Views render that state and never infer that stale data is live.
+
+At boot the firmware shows the branded splash until a phone protocol packet is
+accepted. A connected idle phone lands on Ready; a run-state transition to
+active selects Dashboard, and stop returns to Ready. Music, Stats, and the
+device-local brightness page remain swipeable according to the current run
+state.
 
 ## BLE roles
 

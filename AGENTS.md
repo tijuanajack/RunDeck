@@ -103,8 +103,9 @@ planned work.
 - Current verified path: Android foreground `LocationManager` service →
   `RunSession` flow → `RunDeckBleClient` live-metrics write at 1 Hz → ESP32
   NimBLE server → immutable firmware `DisplayState` → LVGL dashboard.
-- BLE/live-metrics polish is proceeding before protocol/media/notification/HR
-  work. Android exposes a live bridge status; absent Garmin HR must render as
+- The verified V1 path is Android foreground GPS/media/notification/context
+  state → serialized BLE writes → immutable firmware `DisplayState` → LVGL
+  views. Android exposes a live bridge status; absent Garmin HR must render as
   unavailable (`--` / `GARMIN STRAP OFF`), never as a fake or zero BPM value.
 - Live metrics are v1, little-endian, 33 bytes total. Preserve validation,
   sequence and freshness protections in `firmware/RunDeck/ble/rundeck_ble.cpp`
@@ -117,11 +118,10 @@ planned work.
   bounds on connect/start/stop changes; firmware validates and stores it, then
   renders the Android-owned target label. Keep display-bound strings ASCII
   unless LVGL font coverage is intentionally expanded.
-- Android phone-side run controls now include pause, resume, stop, moving time,
-  and a local resume/discard checkpoint screen. The display still needs a
-  production-grade paused-state rendering path, but first-slice device-origin
-  commands over characteristic `0005` now exist; keep them clearly labeled as
-  pending physical verification.
+- Android phone-side run controls include pause, resume, stop, moving time, and
+  a local resume/discard checkpoint screen. RunDeck exposes the matching
+  device-origin controls over characteristic `0005`, including START; Android
+  16 starts location tracking only after the visible Activity is foreground.
 - Device Setup exposes a user-controlled BACKGROUND RUNS battery-optimization
   exemption flow. It must remain opt-in and must be rechecked after returning
   from Android Settings; never attempt to change the exemption silently.
@@ -161,7 +161,8 @@ planned work.
   bounded ASCII CBOR packet sourced from active Android MediaSession
   controllers. The Android app has phone-side previous/play-pause/next buttons,
   and RunDeck Music-screen PREV/PLAY-PAUSE/NEXT now send device-origin media
-  control events over characteristic `0005`; user confirmation is still needed.
+  control events over characteristic `0005`; the user confirmed these controls
+  work with the phone.
   Keep display-bound media strings backed by persistent storage, not local
   decoded packet copies; the temporary-copy bug caused random characters under
   the song title. Long Music-screen titles use LVGL circular scrolling, and
@@ -188,7 +189,8 @@ planned work.
   local swipe-down dismiss. Android has a first app-level allowlist UI with
   forwarding on/off, all-message-apps mode, selected-sources mode, and local
   persistence for observed/common message apps. Contact allowlisting, Android
-  dismissal ack, and fragmentation are not complete.
+  dismissal routing, and bounded fragmentation are implemented; content and
+  notification keys remain in memory only.
 - Environment context uses characteristic `0006`: Android sends local
   `h:mm AM/PM` and Open-Meteo Fahrenheit state every 30 seconds, with weather
   refreshes capped at 10 minutes and stale/unavailable labels preserved on the

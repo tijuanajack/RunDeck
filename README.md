@@ -8,29 +8,27 @@ ESP32-S3-Touch-AMOLED-2.41-B, paired with an Android phone.
 | Directory | Purpose |
 | --- | --- |
 | `firmware/` | Arduino-core firmware and board bring-up tooling |
-| `android/` | Kotlin/Compose companion application scaffold |
+| `android/` | Kotlin/Compose Android companion application |
 | `protocol/` | Versioned BLE wire contract and test vectors |
 | `docs/` | Architecture, hardware validation, and test plans |
 | `assets/` | Project-owned fonts, icons, and mockups |
 
-## Start here
+## Current V1
 
-1. Read [hardware validation](docs/hardware-validation.md) before flashing a
-   board. The current Waveshare demo archive identifies its panel driver as
-   **SH8601**, not RM690B0; validation on the delivered device is the source of
-   truth.
-2. Install Arduino CLI and ESP32 Arduino core `3.0.7`, then run
-   `firmware/tools/fetch-waveshare-bsp.sh`. It obtains the unmodified vendor
-   display/touch source locally; it is intentionally not committed.
-3. Build `firmware/RunDeck/RunDeck.ino` for the Waveshare ESP32-S3 board after
-   the vendor LVGL test has flashed successfully.
+1. Read [hardware validation](docs/hardware-validation.md) and
+   [recovery](docs/recovery.md) before flashing. The delivered board uses the
+   verified Waveshare V2 TCA9554 reset sequence and SH8601 QSPI panel path.
+2. Install the pinned Arduino toolchain from [firmware/README.md](firmware/README.md),
+   then build or flash only after identifying the Espressif USB JTAG port.
+3. Build the Android companion with `./gradlew testDebugUnitTest assembleDebug`
+   from `android/`.
 
-The currently verified milestone is an end-to-end Android GPS run: the phone's
-foreground location service sends live pace, distance, elapsed time, and
-pace-target status to the ESP32 display over BLE. A short real walk has
-verified that phone and display values agree. See
-[implementation status](docs/status.md) for the exact boundary between working
-features and planned V1 work.
+V1 is an end-to-end Android GPS run: the phone owns timing, location, pace,
+distance, targets, presets, weather, media, notifications, and configuration;
+RunDeck renders the fresh state over BLE. The device boots through the branded
+waiting screen, lands on Ready, starts from either phone or RunDeck, shows the
+live Dashboard, and returns to Ready after stop. See
+[implementation status](docs/status.md) for verified behavior and future work.
 
 ## Git workflow
 

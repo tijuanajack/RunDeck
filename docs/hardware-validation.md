@@ -1,15 +1,16 @@
 # Hardware validation log
 
-This document is a required gate before RunDeck firmware is flashed. Do not
-erase factory/test firmware until its recovery image has been obtained from the
-Waveshare archive and its behavior recorded.
+This is the historical bring-up record and the safety gate for future firmware
+flashes. The current board has a local factory recovery image and a verified
+RunDeck image; preserve both before changing the display or power path.
 
 ## Confirmed from the current vendor archive
 
 - Board: ESP32-S3, 16 MB flash, 8 MB PSRAM; 600 × 450 AMOLED; 5-point I2C touch.
 - Vendor Arduino board package: ESP32 core 3.0.7; LVGL 8.4.0; RGB565.
-- Landscape test uses 600 × 450, QSPI CS/CLK/D0..D3 on GPIO9..14, reset GPIO21,
-  and touch I2C SDA/SCL on GPIO47/48.
+- The working V2 path uses 600 × 450 SH8601 QSPI, GPIO47/48 for the shared I2C
+  bus, TCA9554 EXIO0 for OLED reset, and EXIO1 for touch reset. Direct GPIO21
+  LCD reset is disabled.
 - The 2025 vendor LVGL source uses `esp_lcd_sh8601`, not RM690B0. Treat the
   delivered board and unmodified vendor test as authoritative.
 
@@ -17,18 +18,18 @@ Waveshare archive and its behavior recorded.
 
 | Item | Result |
 | --- | --- |
-| Board marking / case revision | |
-| USB serial device | |
-| Arduino CLI version | |
-| ESP32 core/FQBN/options | |
-| Vendor archive hash | |
-| Vendor display test flashed | |
-| Landscape orientation/touch mapping | |
-| BLE scan/advertise test | |
-| Wi-Fi test | |
-| ADC result, USB only | |
-| ADC result, installed LiPo | |
-| Factory restore command/image | |
+| Board marking / case revision | Waveshare ESP32-S3 Touch AMOLED 2.41-B; exact case revision not recorded |
+| USB serial device | Espressif USB JTAG serial debug unit; port number is session-dependent |
+| Arduino CLI version | Verify with `arduino-cli version` before a release flash |
+| ESP32 core/FQBN/options | Core 3.0.7; `esp32:esp32:waveshare_esp32_s3_touch_amoled_241`; upload 115200 |
+| Vendor archive hash | Not recorded; vendor archive is not committed |
+| Vendor display test flashed | Legacy examples attempted and failed cold boot; V2 RunDeck BSP is the working path |
+| Landscape orientation/touch mapping | 600 × 450 landscape UI and touch navigation confirmed |
+| BLE scan/advertise test | RunDeck advertises and Android discovers/connects/reconnects |
+| Wi-Fi test | Not required by V1; not recorded |
+| ADC result, USB only | Not calibrated; battery percentage remains provisional |
+| ADC result, installed LiPo | Not calibrated; battery percentage remains provisional |
+| Factory restore command/image | `firmware/backups/factory-before-rundeck.bin`; use `tools/restore-factory.sh` |
 
 ## 2026-07-30 cold-boot finding
 
@@ -39,7 +40,7 @@ The untouched vendor ESP-IDF LVGL test also left the panel black. Therefore
 the issue is not RunDeck UI, BLE, touch, or cable reliability; neither generic
 vendor build currently matches this board's factory boot/flash configuration.
 The factory backup has a different bootloader and partition table. Preserve
-the board on the factory image while its configuration is extracted.
+the factory image as the recovery path.
 
 The original cable was also defective: full-image recovery repeatedly dropped
 at about 14%. With the replacement cable and the ESP32-S3 ROM loader
@@ -50,11 +51,10 @@ The factory image identifies as ESP-IDF 5.5.2 and contains the vendor
 `10_FactoryProgram` modules. Rebuilding that project under ESP-IDF 5.5.2
 produced an exact matching partition table plus matching bootloader and app
 image header/segment layouts. It displayed after upload reset but still failed
-after a true USB cold boot. The remaining investigation must capture serial
-logs from that cold boot and compare runtime initialization behavior; do not
-replace it with another speculative display build.
+after a true USB cold boot; this is retained as historical failure analysis,
+not as the current RunDeck path.
 
-Serial diagnostics identified the immediate incompatibility: the downloaded
+Serial diagnostics identified the historical incompatibility: the downloaded
 FactoryProgram source uses the obsolete legacy I2C panel wrapper, while the
 factory binary uses `esp_lcd_touch_new_i2c_ft5x06`. With the current resolved
 `esp_lcd_touch_ft5x06` component, the former aborts because it supplies
@@ -62,20 +62,20 @@ factory binary uses `esp_lcd_touch_new_i2c_ft5x06`. With the current resolved
 Program is IDF-version-sensitive and advises its supplied test binary for
 validation. Do not rely on the archive's floating component dependencies;
 obtain or reconstruct the newer factory BSP revision and lock every component
-before the next device flash.
+before any future display-driver experiment.
 
 ## Required procedure
 
-1. Fetch the vendor archive using `firmware/tools/fetch-waveshare-bsp.sh`.
-2. Build and flash its ADC, I2C/RTC, IMU, Wi-Fi, battery, and LVGL examples
-   without modification. Capture serial output and exact commands.
-3. Verify display rotation, touch coordinates, and repeated reset behavior.
-4. Only then port the minimal display/touch adapter into `firmware/RunDeck`.
-5. Record battery ADC behavior both on USB and an installed LiPo. No battery
-   percentage may be shown in RunDeck before this evidence exists.
-6. Once all required checks pass, use `RUNDECK_HARDWARE_VALIDATED=1
-   firmware/tools/flash-rundeck.sh` to build and flash RunDeck. The script
-   requires exactly one detected serial board.
+1. Keep the factory image and identify the Espressif USB JTAG port with
+   `udevadm`; never guess a `ttyACM` number when the phone is attached.
+2. Build the pinned Arduino image and confirm the V2 TCA9554 reset path is
+   unchanged.
+3. Flash RunDeck only to the identified board, then verify display, touch, BLE,
+   and the branded boot-to-Ready flow.
+4. For any display or power change, restore factory first if the panel is
+   black, then require three true USB unplug/replug boots before continuing.
+5. Record USB-only and installed-LiPo ADC readings before making battery-life
+   or battery-percentage claims; current battery display remains provisional.
 
 BOOT remains a boot/recovery control. PWR is not assigned any RunDeck safety
 action until it has been electrically and behaviorally tested.

@@ -4,7 +4,7 @@ Primary service UUID: `7b2e0000-6d1f-4a91-8a5f-6c796a25a000`. Characteristics
 replace the first group with `7b2e0001` through `7b2e0007` respectively.
 
 | Suffix | Direction | Encoding | Cadence |
-| --- | --- | --- |
+| --- | --- | --- | --- |
 | `0001` live metrics | Android → ESP32 | binary | 1 Hz |
 | `0002` run state/preset | Android → ESP32 | CBOR | change |
 | `0003` media | Android → ESP32 | CBOR | event |
@@ -75,10 +75,11 @@ presenting an old reading as live.
 | `4` | `temperatureAvailable` | bool | False when weather is unavailable. |
 | `5` | `temperatureOffset` | uint | Fahrenheit plus 100, bounded by firmware. |
 
-Low-frequency CBOR payloads have a 768-byte total limit. Notification text is
-sanitized by Android, truncated to 240 UTF-8 bytes, and fragmented with
-`messageId`, `fragmentIndex`, and `fragmentCount`; firmware permits at most
-four outstanding fragments and expires incomplete messages after 10 seconds.
+Low-frequency CBOR payloads are bounded per characteristic. Notification
+payloads are limited to 192 bytes total and are sent as ordered 20-byte
+fragment frames (9-byte fragment header plus an 11-byte chunk); firmware
+reassembles one message at a time and expires incomplete messages after five
+seconds.
 
 Current `Notification` payloads on `0004` are the first unfragmented V1 slice:
 a bounded CBOR map with `version`, `sequence`, `app`, `title`, and `body`.
@@ -117,13 +118,15 @@ Current values:
 | `action` | `2` | Play/pause toggle. |
 | `action` | `3` | Next track. |
 
+Run-control actions on `event_type=0x53` are `4=Pause`, `5=Resume`, `6=Stop`,
+and `7=Start`. A start event asks Android to bring the app visibly forward and
+start its location foreground service; the device enters Dashboard only after
+Android publishes active run state.
+
 Device-origin run-control event (`event_type=0x53`) uses the same 8-byte event
-shape as media controls. Actions are `4=Pause`, `5=Resume`, `6=Stop`, and
-`7=Start`. Android dispatches accepted actions to the foreground run service;
-the device changes pages only after the corresponding Android-owned run-state
-packet is received.
-Android dispatches accepted actions to the foreground run service; the device
-marks paused state on the next live-metrics packet.
+shape as media controls. Android dispatches accepted actions to the foreground
+run service; the device changes pages only after the corresponding
+Android-owned run-state packet is received.
 
 Device-origin notification-dismiss event (`event_type=0x54`) uses the same
 8-byte shape, with `sequence` set to the Android notification sequence and all
