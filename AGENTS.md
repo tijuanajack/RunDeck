@@ -133,6 +133,9 @@ planned work.
 - Contact filtering is opt-in: ALL CONTACTS remains the default, while
   SELECTED mode matches sanitized sender labels within each source package.
   Do not broaden it to infer contacts from unsanitized notification content.
+- `DeviceViewModel` belongs under the `device` package; keep BLE/media/
+  notification/weather coordination out of `MainActivity` as future Gradle
+  feature modules are introduced.
 - Media metadata is now Android-to-device over characteristic `0003` as a
   bounded ASCII CBOR packet sourced from active Android MediaSession
   controllers. The Android app has phone-side previous/play-pause/next buttons,

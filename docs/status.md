@@ -148,6 +148,11 @@ Last verified: 2026-07-30.
   compatibility default) or SELECTED sender mode. Observed sender names are
   sanitized and stored locally with their source package; selected mode must
   be explicitly enabled and does not forward undiscovered senders.
+- Android architecture checkpoint: the device-facing coordinator is now
+  isolated in `android/app/src/main/java/com/rundeck/app/device/DeviceViewModel.kt`.
+  `MainActivity` remains the Compose host while BLE, media, notifications,
+  weather context, and device actions stay behind the device ViewModel
+  boundary. Android tests/build and APK install/launch passed on 2026-07-31.
 - Environment context checkpoint: Android now formats local time and fetches
   current Fahrenheit temperature from Open-Meteo using the active GPS fix,
   caching it with a ten-minute refresh limit and explicit stale/unavailable
@@ -188,8 +193,9 @@ Last verified: 2026-07-30.
 ## Current limitations (do not misrepresent as complete)
 
 - The Android app is still a compact single-module prototype. Hilt, Room,
-  feature modules, full preset editing, and production-grade checkpoint
-  recovery are not implemented.
+  Gradle feature modules, full preset editing, and production-grade checkpoint
+  recovery are not implemented. The first device feature boundary is now in
+  place without changing the working BLE contract.
 - The device currently receives live metrics and the first bounded CBOR
   run-state/preset packet, and Android can read back the first run-state ACK.
   Phone-side pause/resume/stop exists, Android-to-device media metadata is
