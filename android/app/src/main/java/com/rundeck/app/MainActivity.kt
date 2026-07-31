@@ -57,6 +57,7 @@ import com.rundeck.app.run.RunSession
 import com.rundeck.app.run.RunTrackingService
 import com.rundeck.app.run.LongRunTarget
 import com.rundeck.app.run.RunCheckpointStore
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -94,7 +95,10 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
             }
         }
         viewModelScope.launch {
-            RunDeckNotificationBridge.events.collect(bleClient::publishNotification)
+            RunDeckNotificationBridge.events.collect { payload ->
+                bleClient.publishNotification(payload)
+                delay(4_000L)
+            }
         }
     }
     fun scan() = bleClient.startScan()

@@ -117,18 +117,16 @@ Last verified: 2026-07-30.
   hash-verified on 2026-07-30.
 - Messaging overlay checkpoint: the existing Android notification-listener
   service now forwards only clearable, likely message-style notifications,
-  sanitizes app/title/body to printable ASCII, truncates them to bounded V1
-- Messaging overlay checkpoint: the existing Android notification-listener
-  service now forwards only clearable, likely message-style notifications,
-  sanitizes app/title/body to printable ASCII, truncates them to bounded V1
-  lengths, suppresses exact duplicates for 90 seconds, and allows distinct
-  overlays roughly every 8 seconds. Android sends an unfragmented CBOR
-  notification payload on characteristic `0004`. Firmware validates/stores that
-  packet, shows a 12-second modal overlay on any RunDeck screen, and supports
-  local swipe-down dismissal. Android tests/build passed, APK install/launch
-  passed, and firmware compile/flash to `/dev/ttyACM0` were hash-verified on
-  2026-07-30. Full app/contact allowlist UI, Android-side dismissal
-  acknowledgements, and fragmented long notifications remain future work.
+  parses recent individual `MessagingStyle` messages from Samsung / Google
+  bundled conversation notifications, sanitizes app/title/body to printable
+  ASCII, truncates them to bounded V1 lengths, suppresses exact duplicates for
+  90 seconds, and queues bundled messages to the device with a short visible
+  gap. Android sends an unfragmented CBOR notification payload on characteristic
+  `0004`. Firmware validates/stores that packet, shows a 12-second modal
+  overlay on any RunDeck screen, and supports local swipe-down dismissal.
+  Android tests/build passed and APK install/launch passed on 2026-07-30. Full
+  app/contact allowlist UI, Android-side dismissal acknowledgements, and
+  fragmented long notifications remain future work.
 - The selected V1 Long Run target is 8:50–9:20 /mi. Android derives
   `ON TARGET`, `EASE OFF`, `PICK IT UP`, or `GPS WEAK` and sends that state to
   the display. Active-run distance, elapsed time, and pace are checkpointed
