@@ -172,6 +172,10 @@ Last verified: 2026-07-30.
   8/16-bit measurements, stores only the selected strap address, and retries
   reconnects with a bounded backoff. The source remains opt-in through the HR
   ownership selector and unavailable readings clear to `GARMIN STRAP OFF`.
+- HR resilience checkpoint: the selected strap is retained in memory for
+  bounded reconnect attempts without requiring a fresh scan, and a connected
+  strap with no measurement for 10 seconds becomes `HR STALE` and clears BPM.
+  Android tests/build and APK install/launch passed on 2026-07-31.
 - Environment context checkpoint: Android now formats local time and fetches
   current Fahrenheit temperature from Open-Meteo using the active GPS fix,
   caching it with a ten-minute refresh limit and explicit stale/unavailable

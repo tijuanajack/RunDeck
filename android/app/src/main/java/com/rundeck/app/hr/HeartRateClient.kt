@@ -29,12 +29,26 @@ class HeartRateClient(context: Context) {
     private val handler = Handler(Looper.getMainLooper())
     private val preferences = appContext.getSharedPreferences("rundeck_hr", Context.MODE_PRIVATE)
     private var gatt: BluetoothGatt? = null
+    private var selectedDevice: HeartRateDevice? = null
     private var reconnectAttempts = 0
+    private var lastMeasurementAtMs = 0L
     private val seen = linkedMapOf<String, HeartRateDevice>()
     private val _devices = MutableStateFlow<List<HeartRateDevice>>(emptyList())
     val devices: StateFlow<List<HeartRateDevice>> = _devices.asStateFlow()
     private val _state = MutableStateFlow(HeartRateState())
     val state: StateFlow<HeartRateState> = _state.asStateFlow()
+    private val staleCheck = object : Runnable {
+        override fun run() {
+            if (_state.value.connected && lastMeasurementAtMs > 0L && System.currentTimeMillis() - lastMeasurementAtMs > 10_000L) {
+                _state.value = _state.value.copy(bpm = null, status = "HR STALE")
+            }
+            handler.postDelayed(this, 5_000L)
+        }
+    }
+
+    init {
+        handler.postDelayed(staleCheck, 5_000L)
+    }
 
     private val scanCallback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
@@ -105,6 +119,7 @@ class HeartRateClient(context: Context) {
     fun connect(device: HeartRateDevice) {
         scanner?.stopScan(scanCallback)
         reconnectAttempts = 0
+        selectedDevice = device
         preferences.edit().putString(KEY_ADDRESS, device.address).apply()
         gatt?.close()
         gatt = device.device.connectGatt(appContext, false, gattCallback)
@@ -118,11 +133,12 @@ class HeartRateClient(context: Context) {
     }
 
     private fun scheduleReconnect() {
-        val address = preferences.getString(KEY_ADDRESS, null) ?: return
+        val selected = selectedDevice ?: return
         if (reconnectAttempts >= 3) return
-        val device = seen[address]?.device ?: return
         reconnectAttempts++
-        handler.postDelayed({ connect(HeartRateDevice(device.name ?: "HR STRAP", address, device)) }, reconnectAttempts * 2_000L)
+        handler.postDelayed({
+            gatt = selected.device.connectGatt(appContext, false, gattCallback)
+        }, reconnectAttempts * 2_000L)
     }
 
     private fun parseMeasurement(value: ByteArray) {
@@ -132,6 +148,7 @@ class HeartRateClient(context: Context) {
         else if (value.size >= 3) (value[1].toInt() and 0xFF) or ((value[2].toInt() and 0xFF) shl 8)
         else return
         if (bpm !in 30..240) return
+        lastMeasurementAtMs = System.currentTimeMillis()
         _state.value = _state.value.copy(connected = true, bpm = bpm, status = "HR LIVE")
     }
 
