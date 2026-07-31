@@ -111,6 +111,11 @@ class RunDeckProtocolTest {
         assert(payload.size <= RunDeckProtocol.MAX_DISPLAY_CONTEXT_BYTES)
     }
 
+    @Test(expected = IllegalArgumentException::class)
+    fun `protocol settings reject unsafe brightness`() {
+        RunDeckProtocol.encodeProtocolSettings(49, brightness = 15)
+    }
+
     @Test fun `device ack event decodes command and sequence`() {
         val event = RunDeckProtocol.decodeDeviceEvent(byteArrayOf(
             1,
