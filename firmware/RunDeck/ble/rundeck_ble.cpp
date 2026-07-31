@@ -30,6 +30,7 @@ constexpr size_t kRunStateMaxBytes = 128;
 constexpr size_t kMediaMaxBytes = 160;
 constexpr size_t kNotificationMaxBytes = 192;
 constexpr size_t kDisplayContextMaxBytes = 96;
+constexpr size_t kHeartbeatBytes = 9;
 constexpr uint32_t kMetricsFreshForMs = 5000;
 constexpr uint32_t kMediaFreshForMs = 30000;
 constexpr uint32_t kNotificationVisibleForMs = 12000;
@@ -110,6 +111,11 @@ uint16_t lastDisplayContextSequence = 0;
 uint32_t displayContextReceivedAtMs = 0;
 bool haveDisplayContext = false;
 bool haveDisplayContextSequence = false;
+uint32_t heartbeatReceivedAtMs = 0;
+uint32_t lastHeartbeatSourceMs = 0;
+uint16_t lastHeartbeatSequence = 0;
+bool haveHeartbeat = false;
+bool haveHeartbeatSequence = false;
 uint32_t batterySampledAtMs = 0;
 uint8_t batteryPercent = 0;
 bool batteryAvailable = false;
@@ -529,6 +535,30 @@ class DisplayContextCallbacks : public NimBLECharacteristicCallbacks {
 
 DisplayContextCallbacks displayContextCallbacks;
 
+class HeartbeatCallbacks : public NimBLECharacteristicCallbacks {
+  void onWrite(NimBLECharacteristic* characteristic, NimBLEConnInfo&) override {
+    const std::string value = characteristic->getValue();
+    if (value.size() != kHeartbeatBytes) return;
+    const auto* input = reinterpret_cast<const uint8_t*>(value.data());
+    if (input[0] != kProtocolVersion || u16(input + 7) != 0) return;
+    const uint16_t sequence = u16(input + 1);
+    const uint32_t sourceMs = u32(input + 3);
+    portENTER_CRITICAL(&metricsMux);
+    const bool replayed = haveHeartbeatSequence && static_cast<int16_t>(sequence - lastHeartbeatSequence) <= 0;
+    const bool olderSource = haveHeartbeat && static_cast<int32_t>(sourceMs - lastHeartbeatSourceMs) <= 0;
+    if (!replayed && !olderSource) {
+      lastHeartbeatSequence = sequence;
+      lastHeartbeatSourceMs = sourceMs;
+      heartbeatReceivedAtMs = millis();
+      haveHeartbeat = true;
+      haveHeartbeatSequence = true;
+    }
+    portEXIT_CRITICAL(&metricsMux);
+  }
+};
+
+HeartbeatCallbacks heartbeatCallbacks;
+
 class ServerCallbacks : public NimBLEServerCallbacks {
   void onDisconnect(NimBLEServer*, NimBLEConnInfo&, int) override {
     NimBLEDevice::startAdvertising();
@@ -564,7 +594,9 @@ void RunDeckBle::begin() {
   NimBLECharacteristic* settings = service->createCharacteristic(
       kSettingsUuid, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR);
   settings->setCallbacks(&displayContextCallbacks);
-  service->createCharacteristic(kHeartbeatUuid, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::NOTIFY);
+  NimBLECharacteristic* heartbeat = service->createCharacteristic(
+      kHeartbeatUuid, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::NOTIFY);
+  heartbeat->setCallbacks(&heartbeatCallbacks);
   pinMode(kBatteryEnablePin, OUTPUT);
   digitalWrite(kBatteryEnablePin, HIGH);
   analogReadResolution(12);

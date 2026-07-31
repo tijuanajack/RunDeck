@@ -5,6 +5,11 @@ import org.junit.Assert.assertArrayEquals
 import org.junit.Test
 
 class RunDeckProtocolTest {
+    @Test fun `heartbeat is a fixed versioned little endian frame`() {
+        val frame = RunDeckProtocol.encodeHeartbeat(0x1234, 0x01020304)
+        assertEquals(RunDeckProtocol.HEARTBEAT_BYTES, frame.size)
+        assertArrayEquals(byteArrayOf(1, 0x34, 0x12, 4, 3, 2, 1, 0, 0), frame)
+    }
     @Test fun `live metrics round trip preserves every field`() {
         val metrics = LiveMetrics(15, 505, 12345, 72, 70, 320, 780, 143)
         val decoded = RunDeckProtocol.decodeLiveMetrics(RunDeckProtocol.encodeLiveMetrics(42, 1234, metrics))

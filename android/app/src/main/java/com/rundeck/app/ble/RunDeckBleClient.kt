@@ -84,6 +84,7 @@ class RunDeckBleClient(context: Context) {
     private val bluetoothManager = appContext.getSystemService(BluetoothManager::class.java)
     private val scanner: BluetoothLeScanner? get() = bluetoothManager?.adapter?.bluetoothLeScanner
     private val sequence = AtomicInteger(0)
+    private val heartbeatSequence = AtomicInteger(0)
     private var gatt: BluetoothGatt? = null
     private var liveMetrics: BluetoothGattCharacteristic? = null
     private var runState: BluetoothGattCharacteristic? = null
@@ -91,6 +92,7 @@ class RunDeckBleClient(context: Context) {
     private var notificationPayload: BluetoothGattCharacteristic? = null
     private var displayContext: BluetoothGattCharacteristic? = null
     private var deviceEvents: BluetoothGattCharacteristic? = null
+    private var heartbeat: BluetoothGattCharacteristic? = null
     private val demoHandler = Handler(Looper.getMainLooper())
     private var streamingDemoMetrics = false
     private var protocolStarted = false
@@ -167,7 +169,8 @@ class RunDeckBleClient(context: Context) {
             notificationPayload = service?.getCharacteristic(RunDeckProtocol.NOTIFICATION_UUID)
             displayContext = service?.getCharacteristic(RunDeckProtocol.SETTINGS_UUID)
             deviceEvents = service?.getCharacteristic(RunDeckProtocol.DEVICE_EVENT_UUID)
-            if (status == BluetoothGatt.GATT_SUCCESS && liveMetrics != null && runState != null && mediaMetadata != null && notificationPayload != null && displayContext != null && deviceEvents != null) {
+            heartbeat = service?.getCharacteristic(RunDeckProtocol.HEARTBEAT_UUID)
+            if (status == BluetoothGatt.GATT_SUCCESS && liveMetrics != null && runState != null && mediaMetadata != null && notificationPayload != null && displayContext != null && deviceEvents != null && heartbeat != null) {
                 _bridge.value = _bridge.value.copy(connected = true, lastError = null)
                 enableDeviceEventNotifications()
                 beginProtocolStream()
@@ -215,6 +218,11 @@ class RunDeckBleClient(context: Context) {
                         _bridge.value.copy(connected = true, lastWriteConfirmedMs = now, lastError = null)
                     } else {
                         _bridge.value.copy(lastError = "METRIC WRITE FAILED ($status)")
+                    }
+                }
+                RunDeckProtocol.HEARTBEAT_UUID -> {
+                    if (status != BluetoothGatt.GATT_SUCCESS) {
+                        _bridge.value = _bridge.value.copy(lastError = "HEARTBEAT WRITE FAILED ($status)")
                     }
                 }
             }
@@ -513,6 +521,29 @@ class RunDeckBleClient(context: Context) {
         sendRunState(currentRunState ?: RunUiState())
         sendMediaState(currentMediaState)
         publishDisplayContext(currentDisplayContext)
+        startHeartbeat()
+    }
+
+    private fun startHeartbeat() {
+        demoHandler.removeCallbacks(heartbeatRunnable)
+        demoHandler.post(heartbeatRunnable)
+    }
+
+    private val heartbeatRunnable = object : Runnable {
+        override fun run() {
+            val target = heartbeat
+            if (gatt == null || target == null || !protocolStarted) return
+            queueWrite(
+                target,
+                RunDeckProtocol.encodeHeartbeat(
+                    heartbeatSequence.getAndIncrement() and 0xFFFF,
+                    SystemClock.elapsedRealtime() and 0xFFFF_FFFFL,
+                ),
+                BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT,
+                OP_HEARTBEAT,
+            )
+            demoHandler.postDelayed(this, HEARTBEAT_INTERVAL_MS)
+        }
     }
 
     @SuppressLint("MissingPermission")
@@ -592,6 +623,7 @@ class RunDeckBleClient(context: Context) {
         notificationPayload = null
         displayContext = null
         deviceEvents = null
+        heartbeat = null
         notificationKeys.clear()
         pendingGattOps.clear()
         gattOperationInFlight = false
@@ -608,6 +640,7 @@ class RunDeckBleClient(context: Context) {
         notificationPayload = null
         displayContext = null
         deviceEvents = null
+        heartbeat = null
         pendingGattOps.clear()
         gattOperationInFlight = false
         protocolStarted = false
@@ -641,6 +674,7 @@ class RunDeckBleClient(context: Context) {
         notificationPayload = null
         displayContext = null
         deviceEvents = null
+        heartbeat = null
         pendingGattOps.clear()
         gattOperationInFlight = false
         protocolStarted = false
@@ -673,6 +707,8 @@ class RunDeckBleClient(context: Context) {
         const val OP_CONTEXT = "CONTEXT"
         const val OP_ACK_READ = "ACK READ"
         const val OP_EVENT_SUBSCRIBE = "EVENT SUBSCRIBE"
+        const val OP_HEARTBEAT = "HEARTBEAT"
+        const val HEARTBEAT_INTERVAL_MS = 10_000L
         val CCCD_UUID: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
     }
 }

@@ -36,6 +36,7 @@ object RunDeckProtocol {
     const val MAX_MEDIA_STATE_BYTES = 160
     const val MAX_NOTIFICATION_BYTES = 192
     const val MAX_DISPLAY_CONTEXT_BYTES = 96
+    const val HEARTBEAT_BYTES = 9
 
     private const val RUN_KEY_VERSION = 0
     private const val RUN_KEY_SEQUENCE = 1
@@ -83,6 +84,14 @@ object RunDeckProtocol {
         frame.putInt(metrics.movingSeconds.toInt()).putShort(metrics.speedCentimetersPerSecond.toShort())
         frame.putShort(metrics.temperatureDeciF.toShort()).put(metrics.forwardedHeartRate.toByte())
         return frame.array()
+    }
+
+    /** Fixed v1 heartbeat: version, sequence, phone monotonic time, reserved extension. */
+    fun encodeHeartbeat(sequence: Int, sourceMonotonicMs: Long): ByteArray {
+        require(sequence in 0..0xFFFF)
+        require(sourceMonotonicMs in 0..0xFFFF_FFFFL)
+        return ByteBuffer.allocate(HEARTBEAT_BYTES).order(ByteOrder.LITTLE_ENDIAN)
+            .put(VERSION).putShort(sequence.toShort()).putInt(sourceMonotonicMs.toInt()).putShort(0).array()
     }
 
     fun decodeLiveMetrics(frame: ByteArray): DecodedLiveMetrics {

@@ -256,8 +256,10 @@ Last verified: 2026-07-30.
   run-state/preset packet, and Android can read back the first run-state ACK.
   Phone-side pause/resume/stop exists, Android-to-device media metadata is
   wired, device-origin Music-screen controls are wired, and device-origin
-  run-control commands now have their first end-to-end slice. Notification
-  settings and heartbeat contracts are not implemented end-to-end.
+  run-control commands now have their first end-to-end slice. The v1 heartbeat
+  is now sent every 10 seconds and validated on the device for version,
+  reserved bytes, sequence, and monotonic source time. Notification
+  fragmentation and settings negotiation remain future work.
 - Heart rate remains optional. Live phone-GPS runs display the Garmin strap as
   off/unavailable until an actual HR source is connected. Garmin HRM-Dual
   direct mode, concurrent central/peripheral soak testing, and a real
