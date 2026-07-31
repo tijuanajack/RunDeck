@@ -151,6 +151,9 @@ planned work.
   bounded, retain only the selected device address, and clear BPM on source
   loss; do not make direct-device HR appear available before the concurrent
   ESP32 central/peripheral soak gate.
+- The firmware direct client is in `hr/direct_hr.*` and is deliberately
+  disabled in `RunDeck.ino` until soak testing proves Android peripheral
+  throughput, HR reconnection, and UI responsiveness together.
 - Media metadata is now Android-to-device over characteristic `0003` as a
   bounded ASCII CBOR packet sourced from active Android MediaSession
   controllers. The Android app has phone-side previous/play-pause/next buttons,

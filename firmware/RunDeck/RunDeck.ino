@@ -6,12 +6,14 @@
 #include "ble/rundeck_ble.h"
 #include "board/waveshare_board.h"
 #include "ui/dashboard.h"
+#include "hr/direct_hr.h"
 
 // Arduino CLI does not compile sketch subdirectories. Keep the implementation
 // modular on disk, then include it once at the composition root.
 #include "app/simulated_data.cpp"
 #include "ble/rundeck_ble.cpp"
 #include "ui/dashboard.cpp"
+#include "hr/direct_hr.cpp"
 #include "board/waveshare_board.cpp"
 
 // Board initialization deliberately remains a narrow adapter. Keep it aligned
@@ -22,6 +24,7 @@ namespace {
 rundeck::SimulatedData simulator;
 rundeck::Dashboard dashboard;
 rundeck::RunDeckBle ble;
+rundeck::DirectHrClient directHr;
 uint32_t lastRenderMs = 0;
 
 void onMediaControl(rundeck::MediaControlAction action, void*) {
@@ -53,10 +56,13 @@ void setup() {
   dashboard.setRunControlHandler(onRunControl, nullptr);
   dashboard.setNotificationDismissHandler(onNotificationDismiss, nullptr);
   ble.begin();
+  directHr.begin();
+  directHr.setEnabled(false);  // Enable only after the concurrent-role soak gate.
 }
 
 void loop() {
   const uint32_t now = millis();
+  directHr.tick(now);
   lv_timer_handler();
   if (now - lastRenderMs >= 1000) {
     lastRenderMs = now;
