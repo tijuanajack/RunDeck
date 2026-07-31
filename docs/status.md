@@ -149,6 +149,10 @@ Last verified: 2026-07-30.
   battery enable; invalid ADC values render `BAT --`. Firmware compiled and
   flashed successfully on 2026-07-31; Android build passed and the updated APK
   installed/launched on the attached Samsung with no fatal startup crash.
+- Clock rendering fix: firmware now keeps the decoded Android clock label in
+  its persistent BLE context buffer instead of pointing the LVGL state at a
+  temporary stack copy. The fix compiled and flashed successfully on
+  2026-07-31.
 - The selected V1 Long Run target is 8:50–9:20 /mi. Android derives
   `ON TARGET`, `EASE OFF`, `PICK IT UP`, or `GPS WEAK` and sends that state to
   the display. Active-run distance, elapsed time, and pace are checkpointed

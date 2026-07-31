@@ -622,20 +622,25 @@ void RunDeckBle::applyNotificationState(DisplayState* state, uint32_t nowMs) {
 }
 
 void RunDeckBle::applyDisplayContext(DisplayState* state, uint32_t nowMs) {
-  DisplayContextConfig context{};
   uint32_t receivedAt = 0;
   bool valid = false;
+  bool temperatureAvailable = false;
+  uint8_t weatherState = 2;
+  int8_t temperatureF = -128;
   portENTER_CRITICAL(&metricsMux);
   valid = haveDisplayContext;
-  context = latestDisplayContext;
   receivedAt = displayContextReceivedAtMs;
+  weatherState = latestDisplayContext.weatherState;
+  temperatureAvailable = latestDisplayContext.temperatureAvailable;
+  temperatureF = latestDisplayContext.temperatureF;
+  if (valid) state->clockLabel = latestDisplayContext.clockLabel;
   portEXIT_CRITICAL(&metricsMux);
 
   const bool fresh = valid && nowMs - receivedAt <= kDisplayContextFreshForMs;
   state->clock = {fresh ? SourceState::Connected : SourceState::Stale, receivedAt};
-  state->weather = {fresh ? static_cast<SourceState>(context.weatherState) : SourceState::Stale, receivedAt};
-  state->clockLabel = fresh ? context.clockLabel : "TIME OFFLINE";
-  state->temperatureF = (fresh && context.temperatureAvailable) ? context.temperatureF : -128;
+  state->weather = {fresh ? static_cast<SourceState>(weatherState) : SourceState::Stale, receivedAt};
+  if (!fresh) state->clockLabel = "TIME OFFLINE";
+  state->temperatureF = (fresh && temperatureAvailable) ? temperatureF : -128;
 }
 
 void RunDeckBle::applyBatteryState(DisplayState* state, uint32_t nowMs) {
