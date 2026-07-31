@@ -303,6 +303,12 @@ Last verified: 2026-07-30.
   The Android protocol decoder, device-event routing, firmware compile, and
   Android unit/build checks pass. Physical start/stop and brightness taps still
   require the final smoke test.
+- Android 16 device-start fix: starting a location foreground service directly
+  from the BLE callback caused a Samsung `SecurityException` and app crash.
+  Device-origin start now brings the Activity to the foreground before starting
+  the service, and the service safely handles any rejected launch. The APK was
+  rebuilt and installed; the user verified that tapping `START RUN` on RunDeck
+  now starts the phone run and reaches the live Dashboard.
 - Heart rate remains optional. Live phone-GPS runs display the Garmin strap as
   off/unavailable until an actual HR source is connected. Phone-forwarded HR
   is implemented and parser/discovery-tested. Garmin HRM-Dual direct mode and
