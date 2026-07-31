@@ -6,8 +6,8 @@ namespace rundeck {
 namespace {
 constexpr char kHeartRateService[] = "180D";
 constexpr char kHeartRateMeasurement[] = "2A37";
-constexpr uint32_t kScanWindowMs = 5000;
-constexpr uint32_t kReconnectBackoffMs = 3000;
+constexpr uint32_t kScanWindowMs = 3000;
+constexpr uint32_t kReconnectBackoffMs = 5000;
 constexpr uint32_t kStaleMs = 10000;
 DirectHrClient* activeClient = nullptr;
 
@@ -40,7 +40,12 @@ NimBLEScan* scan = nullptr;
 void DirectHrClient::begin() {
   activeClient = this;
   scan = NimBLEDevice::getScan();
-  scan->setActiveScan(true);
+  // Passive, duty-cycled scanning leaves airtime for the RunDeck peripheral
+  // advertisement and the Android connection. The HR service UUID is present
+  // in the Garmin advertisement, so scan responses are not required.
+  scan->setActiveScan(false);
+  scan->setInterval(160);
+  scan->setWindow(40);
   scan->setScanCallbacks(&scanCallbacks, false);
 }
 
@@ -49,6 +54,7 @@ void DirectHrClient::setEnabled(bool enabled) {
   if (!enabled_ && scan && scan->isScanning()) scan->stop();
   if (!enabled_) {
     scanning_ = false;
+    connectionPending_ = false;
     bpm_ = 0;
     client_ = nullptr;
   }
@@ -56,7 +62,29 @@ void DirectHrClient::setEnabled(bool enabled) {
 
 void DirectHrClient::tick(uint32_t nowMs) {
   if (!enabled_ || !scan) return;
-  if (client_ == nullptr && !scanning_ && nowMs - lastAttemptMs_ >= kReconnectBackoffMs) {
+  if (connectionPending_ && scan->isScanning()) {
+    // Do not initiate a central connection from inside the scan callback. It
+    // competes with the peripheral advertiser and was the failure mode seen
+    // in the first concurrent-role soak image.
+    scan->stop();
+    scanning_ = false;
+  }
+  if (connectionPending_ && client_ == nullptr && !scan->isScanning()) {
+    connectionPending_ = false;
+    auto* client = NimBLEDevice::createClient();
+    if (!client) {
+      lastAttemptMs_ = nowMs;
+      return;
+    }
+    client->setClientCallbacks(&clientCallbacks, false);
+    client_ = client;
+    if (!client->connect(pendingAddress_, true, true, true)) {
+      client_ = nullptr;
+      NimBLEDevice::deleteClient(client);
+      lastAttemptMs_ = nowMs;
+    }
+  }
+  if (client_ == nullptr && !scanning_ && !connectionPending_ && nowMs - lastAttemptMs_ >= kReconnectBackoffMs) {
     lastAttemptMs_ = nowMs;
     scanning_ = scan->start(kScanWindowMs, false, true);
   }
@@ -68,17 +96,10 @@ bool DirectHrClient::fresh(uint32_t nowMs) const {
 }
 
 void DirectHrClient::onAdvertised(const void* rawDevice) {
-  if (!enabled_ || client_ != nullptr) return;
+  if (!enabled_ || client_ != nullptr || connectionPending_) return;
   auto* device = static_cast<const NimBLEAdvertisedDevice*>(rawDevice);
-  NimBLEClient* client = NimBLEDevice::createClient();
-  if (!client) return;
-  client->setClientCallbacks(&clientCallbacks, false);
-  if (!client->connect(device)) {
-    NimBLEDevice::deleteClient(client);
-    return;
-  }
-  client_ = client;
-  scanning_ = false;
+  pendingAddress_ = device->getAddress();
+  connectionPending_ = true;
 }
 
 void DirectHrClient::onConnected(void* rawClient) {

@@ -3,6 +3,8 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#include <NimBLEAddress.h>
+
 namespace rundeck {
 
 /**
@@ -28,10 +30,12 @@ class DirectHrClient {
 
   bool enabled_ = false;
   bool scanning_ = false;
+  bool connectionPending_ = false;
   uint32_t lastAttemptMs_ = 0;
   uint32_t lastMeasurementMs_ = 0;
   uint16_t bpm_ = 0;
   void* client_ = nullptr;
+  NimBLEAddress pendingAddress_;
 };
 
 }  // namespace rundeck

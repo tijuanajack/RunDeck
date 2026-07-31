@@ -214,6 +214,11 @@ Last verified: 2026-07-30.
   but the soak image disrupted RunDeck discovery. The current firmware gate is
   disabled again; phone-forwarded HR remains the active default until the
   concurrency design is revised.
+- Direct-device HR concurrency checkpoint: the gated client now uses passive,
+  duty-cycled scanning and defers the central connection until after the scan
+  callback has returned and scanning has stopped. This avoids initiating a
+  connection from the NimBLE scan callback, preserving the RunDeck peripheral
+  advertisement path. The gate remains disabled pending a physical soak.
 - Protocol hardening checkpoint: firmware CBOR decoders now reject duplicate
   integer keys in run-state, media, notification, context, and settings maps
   before applying any candidate state. The firmware compiled and flashed with
