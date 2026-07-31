@@ -204,6 +204,11 @@ Last verified: 2026-07-30.
   bounded reconnect attempts without requiring a fresh scan, and a connected
   strap with no measurement for 10 seconds becomes `HR STALE` and clears BPM.
   Android tests/build and APK install/launch passed on 2026-07-31.
+- HR parser/discovery hardening checkpoint: Android now filters scan results to
+  advertisements that expose the standard Heart Rate Service, uses one shared
+  8/16-bit `0x2A37` decoder with bounds checks, and has unit coverage for valid,
+  malformed, and implausible measurements. APK build/install/launch passed on
+  2026-07-31; a physical strap connection test is still required.
 - Direct-device HR checkpoint: firmware contains a standard `0x180D` /
   `0x2A37` NimBLE central client with bounded scan/reconnect and stale clearing,
   but the soak image disrupted RunDeck discovery. The current firmware gate is
