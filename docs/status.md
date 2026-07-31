@@ -219,6 +219,13 @@ Last verified: 2026-07-30.
   callback has returned and scanning has stopped. This avoids initiating a
   connection from the NimBLE scan callback, preserving the RunDeck peripheral
   advertisement path. The gate remains disabled pending a physical soak.
+- BLE capability finding: the ESP32-S3 silicon supports simultaneous central
+  and peripheral roles. Espressif documents up to nine concurrent NimBLE
+  connections, but also requires controller activity slots for each connection,
+  advertiser, and scanner. The Arduino NimBLE build currently defaults to
+  three host connections and six controller activities. One Android link plus
+  one HR strap is within the hardware budget, but the failed soak proves the
+  present Arduino scheduling/configuration is not reliable enough for V1.
 - Protocol hardening checkpoint: firmware CBOR decoders now reject duplicate
   integer keys in run-state, media, notification, context, and settings maps
   before applying any candidate state. The firmware compiled and flashed with
