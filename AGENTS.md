@@ -136,6 +136,9 @@ planned work.
 - `DeviceViewModel` belongs under the `device` package; keep BLE/media/
   notification/weather coordination out of `MainActivity` as future Gradle
   feature modules are introduced.
+- Device setup composables belong under `device/DeviceSetupScreen.kt`; shared
+  visual primitives belong under `ui/RunDeckComponents.kt`. Preserve the
+  black/lime/cyan visual contract when extracting additional screens.
 - Media metadata is now Android-to-device over characteristic `0003` as a
   bounded ASCII CBOR packet sourced from active Android MediaSession
   controllers. The Android app has phone-side previous/play-pause/next buttons,

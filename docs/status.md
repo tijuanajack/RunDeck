@@ -153,6 +153,10 @@ Last verified: 2026-07-30.
   `MainActivity` remains the Compose host while BLE, media, notifications,
   weather context, and device actions stay behind the device ViewModel
   boundary. Android tests/build and APK install/launch passed on 2026-07-31.
+- Device UI boundary checkpoint: the setup screen, media controls,
+  notification filters, and background-run card now live in the `device`
+  package, while shared RunDeck colors and connection primitives live in
+  `ui/RunDeckComponents.kt`. The Compose activity remains the navigation host.
 - Environment context checkpoint: Android now formats local time and fetches
   current Fahrenheit temperature from Open-Meteo using the active GPS fix,
   caching it with a ten-minute refresh limit and explicit stale/unavailable
