@@ -10,6 +10,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.rundeck.app.ble.DeviceMediaControl
 import com.rundeck.app.ble.DeviceRunControl
+import com.rundeck.app.MainActivity
 import com.rundeck.app.ble.DisplayContextPacket
 import com.rundeck.app.ble.DiscoveredRunDeck
 import com.rundeck.app.ble.RunDeckBleClient
@@ -104,21 +105,29 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
             bleClient.deviceRunControls.collect { control ->
                 Log.i("RunDeck", "RunDeck device control received: $control")
                 val action = when (control) {
-                    DeviceRunControl.Start -> RunTrackingService.ACTION_START
+                    DeviceRunControl.Start -> null
                     DeviceRunControl.Pause -> RunTrackingService.ACTION_PAUSE
                     DeviceRunControl.Resume -> RunTrackingService.ACTION_RESUME
                     DeviceRunControl.Stop -> RunTrackingService.ACTION_STOP
                 }
-                val intent = Intent(getApplication(), RunTrackingService::class.java).setAction(action)
-                runCatching {
-                    if (action == RunTrackingService.ACTION_START) {
-                        getApplication<Application>().startForegroundService(intent)
-                    } else {
-                        getApplication<Application>().startService(intent)
-                    }
-                }.onFailure { error ->
-                    Log.e("RunDeck", "Unable to dispatch $action", error)
+                if (control == DeviceRunControl.Start) {
+                    // Android 16 requires location foreground services to be
+                    // started from an eligible visible state. Bring the app
+                    // forward and let MainActivity start the service after its
+                    // window is visible instead of starting directly in this
+                    // BLE callback.
+                    getApplication<Application>().startActivity(
+                        Intent(getApplication(), MainActivity::class.java)
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                            .putExtra(RunTrackingService.EXTRA_START_FROM_DEVICE, true),
+                    )
+                    return@collect
                 }
+                val serviceIntent = Intent(getApplication(), RunTrackingService::class.java).setAction(requireNotNull(action))
+                runCatching { getApplication<Application>().startService(serviceIntent) }
+                    .onFailure { error ->
+                        Log.e("RunDeck", "Unable to dispatch $action", error)
+                    }
             }
         }
         viewModelScope.launch {

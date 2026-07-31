@@ -72,6 +72,29 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent { RunDeckApp() }
+        startRunAfterDeviceRequest(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        startRunAfterDeviceRequest(intent)
+    }
+
+    private fun startRunAfterDeviceRequest(intent: Intent?) {
+        if (intent?.getBooleanExtra(RunTrackingService.EXTRA_START_FROM_DEVICE, false) != true) return
+        intent.removeExtra(RunTrackingService.EXTRA_START_FROM_DEVICE)
+        setIntent(intent)
+        window.decorView.postDelayed({
+            if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != android.content.pm.PackageManager.PERMISSION_GRANTED &&
+                checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                return@postDelayed
+            }
+            runCatching {
+                val serviceIntent = Intent(this, RunTrackingService::class.java).setAction(RunTrackingService.ACTION_START)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(serviceIntent) else startService(serviceIntent)
+            }
+        }, 700L)
     }
 }
 

@@ -83,7 +83,18 @@ class RunTrackingService : Service(), LocationListener {
     private fun startRun() {
         startedAtMs = SystemClock.elapsedRealtime()
         acquireRunWakeLock()
-        startForeground(NOTIFICATION_ID, notification("Acquiring GPS…"))
+        try {
+            startForeground(NOTIFICATION_ID, notification("Acquiring GPS…"))
+        } catch (_: SecurityException) {
+            // Android 16 can reject a location FGS started from a background
+            // BLE callback. Never crash the process; the visible Activity will
+            // retry after a device-origin start request brings it foreground.
+            releaseRunWakeLock()
+            startedAtMs = 0L
+            RunSession.update(RunUiState(gpsStatus = "OPEN RUNDECK TO START"))
+            stopSelf()
+            return
+        }
         if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
             checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             releaseRunWakeLock()
@@ -280,6 +291,7 @@ class RunTrackingService : Service(), LocationListener {
         const val ACTION_PAUSE = "com.rundeck.app.action.PAUSE_RUN"
         const val ACTION_RESUME = "com.rundeck.app.action.RESUME_RUN"
         const val ACTION_STOP = "com.rundeck.app.action.STOP_RUN"
+        const val EXTRA_START_FROM_DEVICE = "com.rundeck.app.extra.START_FROM_DEVICE"
         private const val CHANNEL_ID = "active_run"
         private const val NOTIFICATION_ID = 41
 
