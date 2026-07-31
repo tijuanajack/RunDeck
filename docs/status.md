@@ -260,7 +260,8 @@ Last verified: 2026-07-30.
   is now sent every 10 seconds and validated on the device for version,
   reserved bytes, sequence, and monotonic source time. Notification
   fragmentation is complete, and the `0006` settings handshake now validates
-  the negotiated fragment/notification limits before context updates.
+  and acknowledges the negotiated fragment/notification limits before context
+  updates.
 - Heart rate remains optional. Live phone-GPS runs display the Garmin strap as
   off/unavailable until an actual HR source is connected. Garmin HRM-Dual
   direct mode, concurrent central/peripheral soak testing, and a real

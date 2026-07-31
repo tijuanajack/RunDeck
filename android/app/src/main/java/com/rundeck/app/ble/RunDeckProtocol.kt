@@ -22,6 +22,7 @@ object RunDeckProtocol {
     const val DEVICE_EVENT_RUN_CONTROL_TYPE: Byte = 0x53
     const val DEVICE_EVENT_NOTIFICATION_DISMISSED_TYPE: Byte = 0x54
     const val COMMAND_RUN_STATE: Byte = 2
+    const val COMMAND_SETTINGS: Byte = 7
     const val MEDIA_CONTROL_PREVIOUS: Byte = 1
     const val MEDIA_CONTROL_PLAY_PAUSE: Byte = 2
     const val MEDIA_CONTROL_NEXT: Byte = 3

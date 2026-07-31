@@ -44,12 +44,14 @@ data class LiveBridgeStatus(
     val lastMediaWriteConfirmedMs: Long = 0,
     val lastRunStateAckSequence: Int? = null,
     val lastRunStateAckMs: Long = 0,
+    val lastSettingsAckMs: Long = 0,
     val lastError: String? = null,
 ) {
     fun label(nowMs: Long = SystemClock.elapsedRealtime()): String = when {
         lastError != null -> lastError
         !connected -> "DISPLAY OFFLINE"
         lastRunStateAckMs > 0 && nowMs - lastRunStateAckMs <= 5_000 -> "PRESET ACCEPTED"
+        lastSettingsAckMs > 0 && nowMs - lastSettingsAckMs <= 5_000 -> "SETTINGS ACCEPTED"
         lastMediaWriteConfirmedMs > 0 && nowMs - lastMediaWriteConfirmedMs <= 3_000 -> "MUSIC → RUNDECK"
         streamingRun && lastWriteConfirmedMs > 0 && nowMs - lastWriteConfirmedMs <= 3_000 -> "PHONE LIVE → RUNDECK"
         streamingRun && lastAttemptMs > 0 -> "SENDING TO RUNDECK…"
@@ -96,6 +98,7 @@ class RunDeckBleClient(context: Context) {
     private val demoHandler = Handler(Looper.getMainLooper())
     private var streamingDemoMetrics = false
     private var protocolStarted = false
+    private var settingsAckPending = false
     private var currentRunState: RunUiState? = null
     private var hrOwnershipMode = HrOwnershipMode.PhoneForwardedHr
     private var currentPreset: RunPreset = RunPresetCatalog.longRun
@@ -208,7 +211,10 @@ class RunDeckBleClient(context: Context) {
                     }
                 }
                 RunDeckProtocol.SETTINGS_UUID -> {
-                    if (status != BluetoothGatt.GATT_SUCCESS) {
+                    if (status == BluetoothGatt.GATT_SUCCESS && settingsAckPending) {
+                        settingsAckPending = false
+                        queueDeviceEventAck()
+                    } else if (status != BluetoothGatt.GATT_SUCCESS) {
                         _bridge.value = _bridge.value.copy(lastError = "CONTEXT WRITE FAILED ($status)")
                     }
                 }
@@ -529,6 +535,7 @@ class RunDeckBleClient(context: Context) {
 
     private fun sendProtocolSettings() {
         val characteristic = displayContext ?: return
+        settingsAckPending = true
         queueWrite(
             characteristic,
             RunDeckProtocol.encodeProtocolSettings(sequence.getAndIncrement() and 0xFFFF),
@@ -592,6 +599,14 @@ class RunDeckBleClient(context: Context) {
                     }
                     startMetricsStream()
                 }
+                if (event is DeviceEvent.Ack && event.commandType == RunDeckProtocol.COMMAND_SETTINGS) {
+                    val now = SystemClock.elapsedRealtime()
+                    _bridge.value = if (event.status == RunDeckProtocol.ACK_OK) {
+                        _bridge.value.copy(connected = true, lastSettingsAckMs = now, lastError = null)
+                    } else {
+                        _bridge.value.copy(lastError = "SETTINGS REJECTED (${event.status.toInt() and 0xFF})")
+                    }
+                }
                 if (event is DeviceEvent.MediaControl) {
                     val control = when (event.action) {
                         RunDeckProtocol.MEDIA_CONTROL_PREVIOUS -> DeviceMediaControl.Previous
@@ -641,6 +656,7 @@ class RunDeckBleClient(context: Context) {
         pendingGattOps.clear()
         gattOperationInFlight = false
         protocolStarted = false
+        settingsAckPending = false
     }
 
     @SuppressLint("MissingPermission")
@@ -657,6 +673,7 @@ class RunDeckBleClient(context: Context) {
         pendingGattOps.clear()
         gattOperationInFlight = false
         protocolStarted = false
+        settingsAckPending = false
         _connection.value = DeviceConnection.Connecting(name)
         gatt = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             device.connectGatt(appContext, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
@@ -691,6 +708,7 @@ class RunDeckBleClient(context: Context) {
         pendingGattOps.clear()
         gattOperationInFlight = false
         protocolStarted = false
+        settingsAckPending = false
         streamingDemoMetrics = false
         demoHandler.removeCallbacksAndMessages(null)
         gatt = null

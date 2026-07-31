@@ -22,6 +22,7 @@ constexpr uint8_t kDeviceEventMediaControlType = 0x52;
 constexpr uint8_t kDeviceEventRunControlType = 0x53;
 constexpr uint8_t kDeviceEventNotificationDismissedType = 0x54;
 constexpr uint8_t kCommandRunState = 2;
+constexpr uint8_t kCommandSettings = 7;
 constexpr uint8_t kAckOk = 0;
 constexpr size_t kHeaderBytes = 12;
 constexpr size_t kLiveMetricsBytes = 21;
@@ -617,13 +618,16 @@ class SettingsCallbacks : public NimBLECharacteristicCallbacks {
       if (!decodeProtocolSettings(input, value.size(), &sequence)) return;
       portENTER_CRITICAL(&metricsMux);
       const bool replayed = haveSettingsSequence && static_cast<int16_t>(sequence - lastSettingsSequence) <= 0;
+      bool accepted = false;
       if (!replayed) {
         lastSettingsSequence = sequence;
         settingsReceivedAtMs = millis();
         haveSettings = true;
         haveSettingsSequence = true;
+        accepted = true;
       }
       portEXIT_CRITICAL(&metricsMux);
+      if (accepted) notifyAck(sequence, kCommandSettings, kAckOk);
       return;
     }
     DisplayContextConfig decoded{};

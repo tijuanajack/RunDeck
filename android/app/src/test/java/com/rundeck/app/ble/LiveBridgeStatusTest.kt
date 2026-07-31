@@ -36,4 +36,9 @@ class LiveBridgeStatusTest {
 
         assertEquals("PRESET ACCEPTED", status.label(nowMs = 12_000))
     }
+
+    @Test fun `recent settings ack reports settings accepted`() {
+        val status = LiveBridgeStatus(connected = true, lastSettingsAckMs = 10_000)
+        assertEquals("SETTINGS ACCEPTED", status.label(nowMs = 12_000))
+    }
 }
