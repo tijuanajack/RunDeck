@@ -28,6 +28,9 @@ rundeck::Dashboard dashboard;
 rundeck::RunDeckBle ble;
 rundeck::DirectHrClient directHr;
 uint32_t lastRenderMs = 0;
+uint32_t lastActivityMs = 0;
+constexpr uint32_t kIdleDisplayTimeoutMs = 60'000;
+bool displaySleeping = false;
 
 void onMediaControl(rundeck::MediaControlAction action, void*) {
   ble.notifyMediaControl(action);
@@ -60,11 +63,19 @@ void setup() {
   ble.begin();
   directHr.begin();
   directHr.setEnabled(kDirectHrSoakEnabled);
+  lastActivityMs = millis();
 }
 
 void loop() {
   const uint32_t now = millis();
   directHr.tick(now);
+  if (rundeck::consumeTouchActivity()) {
+    lastActivityMs = now;
+    if (displaySleeping) {
+      rundeck::setDisplayAwake(true);
+      displaySleeping = false;
+    }
+  }
   rundeck::applyPendingDisplayBrightness();
   lv_timer_handler();
   if (now - lastRenderMs >= 1000) {
@@ -94,6 +105,15 @@ void loop() {
     ble.applyDisplayContext(&state, now);
     ble.applyBatteryState(&state, now);
     ble.applyNotificationState(&state, now);
+    if (state.runActive) {
+      lastActivityMs = now;
+      if (displaySleeping) {
+        rundeck::setDisplayAwake(true);
+        displaySleeping = false;
+      }
+    } else if (!displaySleeping && now - lastActivityMs >= kIdleDisplayTimeoutMs) {
+      displaySleeping = rundeck::setDisplayAwake(false);
+    }
     // The phone sends run-state/media/context during protocol setup even
     // before a run starts. That is enough to leave the branded boot screen;
     // live metrics are still freshness-gated independently below.

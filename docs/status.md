@@ -218,6 +218,11 @@ Last verified: 2026-07-30.
   integer keys in run-state, media, notification, context, and settings maps
   before applying any candidate state. The firmware compiled and flashed with
   the verified Waveshare cold-boot path on 2026-07-31.
+- Idle-display protection checkpoint: when no run is active, the firmware turns
+  the AMOLED off after 60 seconds without touch activity. Touch wakes it, and
+  an active run keeps the display awake. This uses the panel driver's display
+  on/off operation only; the verified reset and battery-power paths are not
+  changed. Physical timeout/wake testing is still required.
 - Environment context checkpoint: Android now formats local time and fetches
   current Fahrenheit temperature from Open-Meteo using the active GPS fix,
   caching it with a ten-minute refresh limit and explicit stale/unavailable

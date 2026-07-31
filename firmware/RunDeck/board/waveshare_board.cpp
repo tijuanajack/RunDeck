@@ -38,6 +38,9 @@ constexpr uint8_t kExpanderOutputMask =
 
 esp_lcd_touch_handle_t touch = nullptr;
 esp_lcd_panel_io_handle_t panelIo = nullptr;
+esp_lcd_panel_handle_t panelHandle = nullptr;
+volatile bool touchActivity = false;
+bool displayAwake = true;
 volatile bool brightnessPending = false;
 volatile uint8_t brightnessPendingLevel = 208;
 lv_disp_draw_buf_t drawBuffer;
@@ -77,6 +80,7 @@ void readTouch(lv_indev_drv_t*, lv_indev_data_t* data) {
   uint8_t count = 0;
   esp_lcd_touch_read_data(touch);
   if (esp_lcd_touch_get_coordinates(touch, &x, &y, nullptr, &count, 1) && count) {
+    touchActivity = true;
     data->point.x = x;
     data->point.y = y;
     data->state = LV_INDEV_STATE_PRESSED;
@@ -156,10 +160,9 @@ bool beginWaveshareBoard() {
       .bits_per_pixel = 16,
       .vendor_config = const_cast<sh8601_vendor_config_t*>(&vendor),
   };
-  esp_lcd_panel_handle_t panel = nullptr;
-  if (esp_lcd_new_panel_sh8601(io, &panelConfig, &panel) != ESP_OK ||
-      esp_lcd_panel_reset(panel) != ESP_OK || esp_lcd_panel_init(panel) != ESP_OK) return false;
-  esp_lcd_panel_disp_on_off(panel, true);
+  if (esp_lcd_new_panel_sh8601(io, &panelConfig, &panelHandle) != ESP_OK ||
+      esp_lcd_panel_reset(panelHandle) != ESP_OK || esp_lcd_panel_init(panelHandle) != ESP_OK) return false;
+  esp_lcd_panel_disp_on_off(panelHandle, true);
   // The AMOLED controller and shared I2C peripherals need time to settle after
   // a real USB power loss. Upload reset is warmer and masked this race.
   delay(120);
@@ -186,7 +189,7 @@ bool beginWaveshareBoard() {
   lv_disp_draw_buf_init(&drawBuffer, first, second, kWidth * kBufferHeight);
   lv_disp_drv_init(&displayDriver);
   displayDriver.hor_res = kWidth; displayDriver.ver_res = kHeight; displayDriver.draw_buf = &drawBuffer;
-  displayDriver.flush_cb = flush; displayDriver.rounder_cb = rounder; displayDriver.user_data = panel;
+  displayDriver.flush_cb = flush; displayDriver.rounder_cb = rounder; displayDriver.user_data = panelHandle;
   lv_disp_t* display = lv_disp_drv_register(&displayDriver);
   static lv_indev_drv_t input;
   lv_indev_drv_init(&input); input.type = LV_INDEV_TYPE_POINTER; input.disp = display; input.read_cb = readTouch;
@@ -194,6 +197,22 @@ bool beginWaveshareBoard() {
   const esp_timer_create_args_t timerArgs = {.callback = tick, .name = "rundeck_lvgl"};
   esp_timer_handle_t timer = nullptr;
   return esp_timer_create(&timerArgs, &timer) == ESP_OK && esp_timer_start_periodic(timer, 2000) == ESP_OK;
+}
+
+bool setDisplayAwake(bool awake) {
+  if (!panelHandle || displayAwake == awake) return true;
+  const bool ok = esp_lcd_panel_disp_on_off(panelHandle, awake) == ESP_OK;
+  if (ok) {
+    displayAwake = awake;
+    Serial.printf("RunDeck display %s\n", awake ? "awake" : "off");
+  }
+  return ok;
+}
+
+bool consumeTouchActivity() {
+  if (!touchActivity) return false;
+  touchActivity = false;
+  return true;
 }
 
 bool setDisplayBrightness(uint8_t level) {
