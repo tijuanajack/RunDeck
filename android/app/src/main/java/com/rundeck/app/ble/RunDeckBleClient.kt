@@ -214,6 +214,11 @@ class RunDeckBleClient(context: Context) {
                 RunDeckProtocol.SETTINGS_UUID -> {
                     if (status == BluetoothGatt.GATT_SUCCESS && settingsAckPending) {
                         settingsAckPending = false
+                        _bridge.value = _bridge.value.copy(
+                            connected = true,
+                            lastSettingsAckMs = SystemClock.elapsedRealtime(),
+                            lastError = null,
+                        )
                         queueDeviceEventAck()
                     } else if (status != BluetoothGatt.GATT_SUCCESS) {
                         _bridge.value = _bridge.value.copy(lastError = "CONTEXT WRITE FAILED ($status)")

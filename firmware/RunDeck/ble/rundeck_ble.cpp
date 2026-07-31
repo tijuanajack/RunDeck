@@ -618,9 +618,13 @@ class SettingsCallbacks : public NimBLECharacteristicCallbacks {
     const std::string value = characteristic->getValue();
     const auto* input = reinterpret_cast<const uint8_t*>(value.data());
     if (!value.empty() && input[0] == 0xA5) {
+      Serial.printf("RunDeck settings packet bytes=%u\n", static_cast<unsigned>(value.size()));
       uint16_t sequence = 0;
       uint8_t brightness = 208;
-      if (!decodeProtocolSettings(input, value.size(), &sequence, &brightness)) return;
+      if (!decodeProtocolSettings(input, value.size(), &sequence, &brightness)) {
+        Serial.println("RunDeck settings rejected");
+        return;
+      }
       portENTER_CRITICAL(&metricsMux);
       const bool replayed = haveSettingsSequence && static_cast<int16_t>(sequence - lastSettingsSequence) <= 0;
       bool accepted = false;

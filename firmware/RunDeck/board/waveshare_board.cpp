@@ -38,6 +38,8 @@ constexpr uint8_t kExpanderOutputMask =
 
 esp_lcd_touch_handle_t touch = nullptr;
 esp_lcd_panel_io_handle_t panelIo = nullptr;
+volatile bool brightnessPending = false;
+volatile uint8_t brightnessPendingLevel = 208;
 lv_disp_draw_buf_t drawBuffer;
 lv_disp_drv_t displayDriver;
 uint8_t expanderState = 0x00;
@@ -196,10 +198,18 @@ bool beginWaveshareBoard() {
 
 bool setDisplayBrightness(uint8_t level) {
   if (!panelIo) return false;
-  const uint8_t value = level;
+  brightnessPendingLevel = level;
+  brightnessPending = true;
+  Serial.printf("RunDeck brightness %u queued\n", level);
+  return true;
+}
+
+void applyPendingDisplayBrightness() {
+  if (!panelIo || !brightnessPending) return;
+  const uint8_t value = brightnessPendingLevel;
+  brightnessPending = false;
   const bool ok = esp_lcd_panel_io_tx_param(panelIo, 0x51, &value, 1) == ESP_OK;
-  Serial.printf("RunDeck brightness %u (%s)\n", level, ok ? "sent" : "failed");
-  return ok;
+  Serial.printf("RunDeck brightness %u (%s)\n", value, ok ? "sent" : "failed");
 }
 
 }  // namespace rundeck

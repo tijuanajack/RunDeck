@@ -65,6 +65,7 @@ void setup() {
 void loop() {
   const uint32_t now = millis();
   directHr.tick(now);
+  rundeck::applyPendingDisplayBrightness();
   lv_timer_handler();
   if (now - lastRenderMs >= 1000) {
     lastRenderMs = now;

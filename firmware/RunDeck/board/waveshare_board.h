@@ -6,5 +6,7 @@ namespace rundeck {
 bool beginWaveshareBoard();
 /** Sets the SH8601 AMOLED brightness without changing the reset/power path. */
 bool setDisplayBrightness(uint8_t level);
+/** Applies a queued brightness change from the LVGL/main loop. */
+void applyPendingDisplayBrightness();
 
 }  // namespace rundeck
