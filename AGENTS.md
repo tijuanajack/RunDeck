@@ -119,9 +119,9 @@ planned work.
   unless LVGL font coverage is intentionally expanded.
 - Android phone-side run controls now include pause, resume, stop, moving time,
   and a local resume/discard checkpoint screen. The display still needs a
-  dedicated paused-state rendering path and device-origin commands over
-  characteristic `0005`; do not describe those as complete until they are wired
-  and verified.
+  production-grade paused-state rendering path, but first-slice device-origin
+  commands over characteristic `0005` now exist; keep them clearly labeled as
+  pending physical verification.
 - Media metadata is now Android-to-device over characteristic `0003` as a
   bounded ASCII CBOR packet sourced from active Android MediaSession
   controllers. The Android app has phone-side previous/play-pause/next buttons,
@@ -139,6 +139,10 @@ planned work.
   operation queue. A Samsung test exposed `prior command is not finished` when
   notification subscription overlapped the protocol start, so keep future GATT
   work on that queue.
+- Device-event `0005` also carries first-slice run controls (`0x53`, actions
+  `4=Pause`, `5=Resume`, `6=Stop`) from a swipe-up RunDeck controls panel.
+  Android dispatches them to `RunTrackingService`; paused state is reflected
+  in live-metrics flags. Keep the event queue serialized.
 - Messaging overlays are first-slice V1: Android forwards only clearable,
   likely message-style notifications through the existing notification-listener
   service, parses recent individual `MessagingStyle` messages from Samsung /

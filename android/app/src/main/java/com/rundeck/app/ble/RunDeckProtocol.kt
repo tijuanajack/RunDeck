@@ -19,10 +19,14 @@ object RunDeckProtocol {
     const val LIVE_METRICS_TYPE: Byte = 1
     const val DEVICE_EVENT_ACK_TYPE: Byte = 0x51
     const val DEVICE_EVENT_MEDIA_CONTROL_TYPE: Byte = 0x52
+    const val DEVICE_EVENT_RUN_CONTROL_TYPE: Byte = 0x53
     const val COMMAND_RUN_STATE: Byte = 2
     const val MEDIA_CONTROL_PREVIOUS: Byte = 1
     const val MEDIA_CONTROL_PLAY_PAUSE: Byte = 2
     const val MEDIA_CONTROL_NEXT: Byte = 3
+    const val RUN_CONTROL_PAUSE: Byte = 4
+    const val RUN_CONTROL_RESUME: Byte = 5
+    const val RUN_CONTROL_STOP: Byte = 6
     const val ACK_OK: Byte = 0
     const val HEADER_BYTES = 12
     const val LIVE_METRICS_BYTES = 21
@@ -121,6 +125,14 @@ object RunDeckProtocol {
                 require(input.short.toInt() == 0) { "Unsupported media-control extension" }
                 require(action in MEDIA_CONTROL_PREVIOUS..MEDIA_CONTROL_NEXT) { "Unknown media-control action" }
                 DeviceEvent.MediaControl(sequence, action)
+            }
+            DEVICE_EVENT_RUN_CONTROL_TYPE -> {
+                val sequence = input.short.toInt() and 0xFFFF
+                val action = input.get()
+                require(input.get().toInt() == 0) { "Unsupported run-control extension" }
+                require(input.short.toInt() == 0) { "Unsupported run-control extension" }
+                require(action in RUN_CONTROL_PAUSE..RUN_CONTROL_STOP) { "Unknown run-control action" }
+                DeviceEvent.RunControl(sequence, action)
             }
             else -> error("Unknown device event type $type")
         }
@@ -361,6 +373,7 @@ data class DecodedLiveMetrics(val sequence: Int, val sourceMonotonicMs: Long, va
 sealed interface DeviceEvent {
     data class Ack(val acknowledgedSequence: Int, val commandType: Byte, val status: Byte) : DeviceEvent
     data class MediaControl(val sequence: Int, val action: Byte) : DeviceEvent
+    data class RunControl(val sequence: Int, val action: Byte) : DeviceEvent
 }
 
 data class RunStatePacket(

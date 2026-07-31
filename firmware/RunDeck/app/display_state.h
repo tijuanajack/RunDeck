@@ -39,6 +39,8 @@ struct DisplayState {
   bool batteryAvailable;
   uint8_t batteryPercent;
   const char* clockLabel;
+  bool runActive;
+  bool runPaused;
 };
 
 }  // namespace rundeck

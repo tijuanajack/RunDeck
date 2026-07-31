@@ -75,6 +75,7 @@ private sealed class GattOperation(val label: String) {
 }
 
 enum class DeviceMediaControl { Previous, PlayPause, Next }
+enum class DeviceRunControl { Pause, Resume, Stop }
 
 class RunDeckBleClient(context: Context) {
     private val appContext = context.applicationContext
@@ -110,6 +111,8 @@ class RunDeckBleClient(context: Context) {
     val bridge: StateFlow<LiveBridgeStatus> = _bridge.asStateFlow()
     private val _deviceMediaControls = MutableSharedFlow<DeviceMediaControl>(extraBufferCapacity = 8)
     val deviceMediaControls: SharedFlow<DeviceMediaControl> = _deviceMediaControls.asSharedFlow()
+    private val _deviceRunControls = MutableSharedFlow<DeviceRunControl>(extraBufferCapacity = 8)
+    val deviceRunControls: SharedFlow<DeviceRunControl> = _deviceRunControls.asSharedFlow()
 
     private val reconnectRunnable = Runnable { reconnectRememberedDevice() }
 
@@ -369,7 +372,7 @@ class RunDeckBleClient(context: Context) {
             sequence.getAndIncrement() and 0xFFFF,
             SystemClock.elapsedRealtime() and 0xFFFF_FFFFL,
             LiveMetrics(
-                flags = 0x0003 or LongRunTarget.status(state.paceSecondsPerMile).packetFlag,
+                flags = 0x0003 or LongRunTarget.status(state.paceSecondsPerMile).packetFlag or if (state.paused) 0x0020 else 0,
                 paceSecondsPerMile = pace,
                 distanceCentimeters = (state.distanceMeters * 100).roundToInt().toLong(),
                 elapsedSeconds = state.elapsedSeconds,
@@ -530,6 +533,15 @@ class RunDeckBleClient(context: Context) {
                         _deviceMediaControls.tryEmit(control)
                         _bridge.value = _bridge.value.copy(connected = true, lastMediaWriteConfirmedMs = SystemClock.elapsedRealtime(), lastError = null)
                     }
+                }
+                if (event is DeviceEvent.RunControl) {
+                    val control = when (event.action) {
+                        RunDeckProtocol.RUN_CONTROL_PAUSE -> DeviceRunControl.Pause
+                        RunDeckProtocol.RUN_CONTROL_RESUME -> DeviceRunControl.Resume
+                        RunDeckProtocol.RUN_CONTROL_STOP -> DeviceRunControl.Stop
+                        else -> null
+                    }
+                    if (control != null) _deviceRunControls.tryEmit(control)
                 }
             }
             .onFailure {

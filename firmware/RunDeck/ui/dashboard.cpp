@@ -94,6 +94,16 @@ void Dashboard::onGesture(lv_event_t* event) {
     }
     return;
   }
+  if (direction == LV_DIR_TOP && self->state_.runActive && self->runControls_) {
+    self->runControlsVisible_ = true;
+    lv_obj_clear_flag(self->runControls_, LV_OBJ_FLAG_HIDDEN);
+    return;
+  }
+  if (direction == LV_DIR_BOTTOM && self->runControls_) {
+    self->runControlsVisible_ = false;
+    lv_obj_add_flag(self->runControls_, LV_OBJ_FLAG_HIDDEN);
+    return;
+  }
   if (direction == LV_DIR_LEFT) self->show(pageForIndex(pageIndex(self->page_) + 1));
   if (direction == LV_DIR_RIGHT) self->show(pageForIndex(pageIndex(self->page_) - 1));
 }
@@ -118,6 +128,16 @@ void Dashboard::onMediaNext(lv_event_t* event) {
   if (self) self->emitMediaControl(MediaControlAction::Next);
 }
 
+void Dashboard::onRunPause(lv_event_t* event) {
+  auto* self = static_cast<Dashboard*>(lv_event_get_user_data(event));
+  if (self) self->emitRunControl(self->state_.runPaused ? RunControlAction::Resume : RunControlAction::Pause);
+}
+
+void Dashboard::onRunStop(lv_event_t* event) {
+  auto* self = static_cast<Dashboard*>(lv_event_get_user_data(event));
+  if (self) self->emitRunControl(RunControlAction::Stop);
+}
+
 void Dashboard::setMediaControlHandler(void (*handler)(MediaControlAction, void*), void* context) {
   mediaControlHandler_ = handler;
   mediaControlContext_ = context;
@@ -127,12 +147,25 @@ void Dashboard::emitMediaControl(MediaControlAction action) {
   if (mediaControlHandler_) mediaControlHandler_(action, mediaControlContext_);
 }
 
+void Dashboard::setRunControlHandler(void (*handler)(RunControlAction, void*), void* context) {
+  runControlHandler_ = handler;
+  runControlContext_ = context;
+}
+
+void Dashboard::emitRunControl(RunControlAction action) {
+  if (runControlHandler_) runControlHandler_(action, runControlContext_);
+}
+
 void Dashboard::show(Screen page) {
   page_ = page;
   pace_ = paceTarget_ = distance_ = elapsed_ = hr_ = hrTarget_ = media_ = nullptr;
   mediaSource_ = mediaTrack_ = mediaArtist_ = mediaPlayButton_ = musicFooter_ = nullptr;
   clock_ = weather_ = battery_ = statsClock_ = statsTemperature_ = nullptr;
   notification_ = notificationApp_ = notificationTitle_ = notificationBody_ = nullptr;
+  runControls_ = runPauseButton_ = nullptr;
+  statsStatus_ = statsStatusDetail_ = nullptr;
+  for (auto& value : statsValues_) value = nullptr;
+  runControlsVisible_ = false;
   lv_obj_clean(content_);
   switch (page_) {
     case Screen::Ready: buildReady(); break;
@@ -141,6 +174,7 @@ void Dashboard::show(Screen page) {
     case Screen::Dashboard: buildDashboard(); break;
   }
   if (!notification_) buildNotification();
+  buildRunControls();
   updateDashboard();
 }
 
@@ -217,7 +251,7 @@ void Dashboard::buildStats() {
   statsClock_ = label(content_, &lv_font_montserrat_20, LV_ALIGN_TOP_MID, 0, 18);
   lv_label_set_text(statsClock_, "TIME OFFLINE");
   const char* names[] = {"PACE", "AVG PACE", "SPEED", "HEART RATE", "HR ZONE", "DISTANCE", "ELAPSED", "TEMP"};
-  const char* values[] = {"8:25", "8:32", "7.0", "143", "135-150", "0.00", "00:47", "78F"};
+  const char* values[] = {"--:--", "--:--", "--", "--", "--", "0.00", "00:00", "--"};
   const char* units[] = {"/MI", "/MI", "MPH", "BPM", "IN ZONE", "MI", "", ""};
   for (int i = 0; i < 8; ++i) {
     const int col = i % 4, row = i / 4;
@@ -226,6 +260,7 @@ void Dashboard::buildStats() {
     lv_label_set_text(name, names[i]);
     lv_obj_t* value = label(cell, &lv_font_montserrat_28, LV_ALIGN_CENTER, 0, 6);
     lv_label_set_text(value, values[i]);
+    statsValues_[i] = value;
     if (i == 7) statsTemperature_ = value;
     lv_obj_t* unit = label(cell, &lv_font_montserrat_14, LV_ALIGN_BOTTOM_MID, 0, -12, i == 4 ? kGreen : kMuted);
     lv_label_set_text(unit, units[i]);
@@ -235,6 +270,8 @@ void Dashboard::buildStats() {
   lv_label_set_text(labelLeft, "ON TARGET");
   lv_obj_t* labelRight = label(status, &lv_font_montserrat_14, LV_ALIGN_RIGHT_MID, -20, 0);
   lv_label_set_text(labelRight, "PACE AND HR IN RANGE");
+  statsStatus_ = labelLeft;
+  statsStatusDetail_ = labelRight;
 }
 
 void Dashboard::buildReady() {
@@ -276,9 +313,30 @@ void Dashboard::buildNotification() {
   lv_obj_add_flag(notification_, LV_OBJ_FLAG_HIDDEN);
 }
 
+void Dashboard::buildRunControls() {
+  runControls_ = panel(content_, 88, 108, 424, 132, kLime);
+  lv_obj_add_flag(runControls_, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_t* hint = label(runControls_, &lv_font_montserrat_14, LV_ALIGN_TOP_MID, 0, 12, kMuted);
+  lv_label_set_text(hint, "RUN CONTROLS");
+  lv_obj_t* pause = panel(runControls_, 18, 42, 180, 70, kCyan);
+  lv_obj_add_flag(pause, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_add_event_cb(pause, onRunPause, LV_EVENT_CLICKED, this);
+  runPauseButton_ = label(pause, &lv_font_montserrat_20, LV_ALIGN_CENTER, 0, 0);
+  lv_label_set_text(runPauseButton_, "PAUSE");
+  lv_obj_t* stop = panel(runControls_, 226, 42, 180, 70, kRed);
+  lv_obj_add_flag(stop, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_add_event_cb(stop, onRunStop, LV_EVENT_CLICKED, this);
+  lv_obj_t* stopText = label(stop, &lv_font_montserrat_20, LV_ALIGN_CENTER, 0, 0);
+  lv_label_set_text(stopText, "STOP RUN");
+}
+
 void Dashboard::updateNotificationOverlay() {
   if (!notification_) return;
   if (state_.notificationVisible && !notificationDismissed_) {
+    if (runControls_) {
+      runControlsVisible_ = false;
+      lv_obj_add_flag(runControls_, LV_OBJ_FLAG_HIDDEN);
+    }
     const char* app = state_.notificationApp ? state_.notificationApp : "MESSAGE";
     const char* title = state_.notificationTitle ? state_.notificationTitle : "";
     const char* body = state_.notificationBody ? state_.notificationBody : "";
@@ -306,6 +364,37 @@ void Dashboard::updateDashboard() {
     }
     if (strcmp(lv_label_get_text(statsTemperature_), temperature) != 0) lv_label_set_text(statsTemperature_, temperature);
   }
+  if (statsValues_[0]) {
+    char stats[24];
+    if (state_.paceMinutesPerMile > 0.0f) {
+      const int seconds = static_cast<int>(lroundf(state_.paceMinutesPerMile * 60.0f));
+      snprintf(stats, sizeof(stats), "%d:%02d", seconds / 60, seconds % 60);
+    } else snprintf(stats, sizeof(stats), "--:--");
+    lv_label_set_text(statsValues_[0], stats);
+
+    const float miles = state_.distanceMiles;
+    if (miles > 0.01f && state_.elapsedSeconds > 0) {
+      const int seconds = static_cast<int>(lroundf(state_.elapsedSeconds / miles));
+      snprintf(stats, sizeof(stats), "%d:%02d", seconds / 60, seconds % 60);
+    } else snprintf(stats, sizeof(stats), "--:--");
+    lv_label_set_text(statsValues_[1], stats);
+
+    if (state_.paceMinutesPerMile > 0.0f) snprintf(stats, sizeof(stats), "%.1f", 60.0f / state_.paceMinutesPerMile);
+    else snprintf(stats, sizeof(stats), "--");
+    lv_label_set_text(statsValues_[2], stats);
+    if (state_.heartRateBpm > 0) snprintf(stats, sizeof(stats), "%u", state_.heartRateBpm);
+    else snprintf(stats, sizeof(stats), "--");
+    lv_label_set_text(statsValues_[3], stats);
+    lv_label_set_text(statsValues_[4], state_.heartRateBpm > 0 ? "IN ZONE" : "--");
+    snprintf(stats, sizeof(stats), "%.2f", miles); lv_label_set_text(statsValues_[5], stats);
+    snprintf(stats, sizeof(stats), "%02lu:%02lu", state_.elapsedSeconds / 60, state_.elapsedSeconds % 60);
+    lv_label_set_text(statsValues_[6], stats);
+    if (state_.weather.state == SourceState::Connected && state_.temperatureF != -128) snprintf(stats, sizeof(stats), "%dF", state_.temperatureF);
+    else snprintf(stats, sizeof(stats), "--");
+    lv_label_set_text(statsValues_[7], stats);
+    if (statsStatus_) lv_label_set_text(statsStatus_, state_.runPaused ? "PAUSED" : (state_.statusText ? state_.statusText : "READY"));
+    if (statsStatusDetail_) lv_label_set_text(statsStatusDetail_, state_.runPaused ? "RUN PAUSED" : (state_.heartRateBpm > 0 ? "LIVE METRICS" : "HR STRAP OFF"));
+  }
   if (weather_) {
     char weather[16];
     if (state_.weather.state == SourceState::Connected && state_.temperatureF != -128) {
@@ -322,6 +411,15 @@ void Dashboard::updateDashboard() {
     if (state_.batteryAvailable) snprintf(battery, sizeof(battery), "BAT %u%%", state_.batteryPercent);
     else snprintf(battery, sizeof(battery), "BAT --");
     if (strcmp(lv_label_get_text(battery_), battery) != 0) lv_label_set_text(battery_, battery);
+  }
+  if (runControls_) {
+    if (!state_.runActive) {
+      runControlsVisible_ = false;
+      lv_obj_add_flag(runControls_, LV_OBJ_FLAG_HIDDEN);
+    } else if (runControlsVisible_) {
+      lv_obj_clear_flag(runControls_, LV_OBJ_FLAG_HIDDEN);
+      if (runPauseButton_) lv_label_set_text(runPauseButton_, state_.runPaused ? "RESUME" : "PAUSE");
+    }
   }
   const char* source = state_.mediaSource ? state_.mediaSource : "PHONE";
   const char* title = state_.mediaTitle ? state_.mediaTitle : "NO MEDIA";

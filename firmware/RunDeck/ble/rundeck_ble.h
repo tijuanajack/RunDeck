@@ -23,6 +23,8 @@ class RunDeckBle {
   void applyBatteryState(DisplayState* state, uint32_t nowMs);
   /** Sends a tapped Music-screen control to Android over device events. */
   void notifyMediaControl(MediaControlAction action);
+  /** Sends a tapped run-control action to Android over device events. */
+  void notifyRunControl(RunControlAction action);
   /** Returns true only when a fresh Android metrics frame was applied. */
   bool applyLiveMetrics(DisplayState* state, uint32_t nowMs);
 };

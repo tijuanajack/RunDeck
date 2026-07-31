@@ -49,6 +49,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rundeck.app.ble.DeviceConnection
 import com.rundeck.app.ble.DeviceMediaControl
+import com.rundeck.app.ble.DeviceRunControl
 import com.rundeck.app.ble.DiscoveredRunDeck
 import com.rundeck.app.ble.LiveBridgeStatus
 import com.rundeck.app.ble.RunDeckBleClient
@@ -106,6 +107,18 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
                     DeviceMediaControl.PlayPause -> mediaController.playPause()
                     DeviceMediaControl.Next -> mediaController.next()
                 }
+            }
+        }
+        viewModelScope.launch {
+            bleClient.deviceRunControls.collect { control ->
+                val action = when (control) {
+                    DeviceRunControl.Pause -> RunTrackingService.ACTION_PAUSE
+                    DeviceRunControl.Resume -> RunTrackingService.ACTION_RESUME
+                    DeviceRunControl.Stop -> RunTrackingService.ACTION_STOP
+                }
+                getApplication<Application>().startService(
+                    Intent(getApplication(), RunTrackingService::class.java).setAction(action),
+                )
             }
         }
         viewModelScope.launch {

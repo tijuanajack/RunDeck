@@ -161,6 +161,14 @@ Last verified: 2026-07-30.
   A dedicated foreground BLE service and Samsung battery-optimization
   guidance remain the next resilience step if lock testing still shows
   dropouts.
+- Run-control/Stats checkpoint: RunDeck now exposes a swipe-up RUN CONTROLS
+  panel with PAUSE/RESUME and STOP RUN buttons. Actions travel as `0005`
+  device events to Android's foreground run service, and paused state is
+  carried in live-metrics flags. The Stats screen now renders live pace,
+  average pace, speed, HR, distance, elapsed, temperature, and status instead
+  of its original mock values. Firmware compile/flash and Android tests/build
+  passed on 2026-07-31; phone APK installation remains pending until ADB sees
+  the Samsung.
 - The selected V1 Long Run target is 8:50–9:20 /mi. Android derives
   `ON TARGET`, `EASE OFF`, `PICK IT UP`, or `GPS WEAK` and sends that state to
   the display. Active-run distance, elapsed time, and pace are checkpointed
@@ -177,10 +185,10 @@ Last verified: 2026-07-30.
 - The device currently receives live metrics and the first bounded CBOR
   run-state/preset packet, and Android can read back the first run-state ACK.
   Phone-side pause/resume/stop exists, Android-to-device media metadata is
-  wired, and device-origin Music-screen controls are implemented pending user
-  confirmation. First messaging overlays are wired. Device-origin
-  pause/resume/stop commands, notification dismissal acknowledgements,
-  settings, and heartbeat contracts are not implemented end-to-end.
+  wired, device-origin Music-screen controls are wired, and device-origin
+  run-control commands now have their first end-to-end slice. Notification
+  dismissal acknowledgements, settings, and heartbeat contracts are not
+  implemented end-to-end.
 - Heart rate remains optional. Live phone-GPS runs display the Garmin strap as
   off/unavailable until an actual HR source is connected. Garmin HRM-Dual
   direct mode, concurrent central/peripheral soak testing, and phone-forwarded
@@ -197,14 +205,13 @@ Last verified: 2026-07-30.
 1. Continue BLE/live phone metrics polish and reconnect visibility; re-run the
    full-UI cold-boot gate three times when the user can physically test it.
    Restore factory immediately on any failed cold boot.
-2. Confirm device-origin previous/play-pause/next from the RunDeck Music screen
-   works on the phone, then polish any tap-size/debounce issues found.
-3. Continue V1 run-state protocol: add device-origin pause/resume/stop command
-   flow and show paused state on the display.
-4. Polish notifications: add explicit allowlist UI and permitted dismissal
-   acknowledgements; then add weather freshness, settings, touch
-   lock/brightness, resilience tests, and outdoor/power validation.
-5. Add optional HR: phone-forwarded HR and target/combined pace-HR status
+2. Physically verify the new swipe-up Run Controls panel and device-origin
+   pause/resume/stop, then polish tap-size/debounce issues found.
+3. Polish notifications: add explicit dismissal acknowledgements and permitted
+   contact-level filtering,
+   then add weather freshness, settings, touch lock/brightness, resilience
+   tests, and outdoor/power validation.
+4. Add optional HR: phone-forwarded HR and target/combined pace-HR status
    rules first, then evaluate direct Garmin HRM-Dual only behind the
    BLE-concurrency soak gate. The strap must be treated as absent when not
    worn/connected.

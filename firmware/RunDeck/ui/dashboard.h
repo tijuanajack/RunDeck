@@ -7,12 +7,14 @@
 namespace rundeck {
 
 enum class MediaControlAction : uint8_t { Previous = 1, PlayPause = 2, Next = 3 };
+enum class RunControlAction : uint8_t { Pause = 4, Resume = 5, Stop = 6 };
 
 class Dashboard {
  public:
   void begin();
   void render(const DisplayState& state);
   void setMediaControlHandler(void (*handler)(MediaControlAction, void*), void* context);
+  void setRunControlHandler(void (*handler)(RunControlAction, void*), void* context);
 
  private:
   static void onGesture(lv_event_t* event);
@@ -20,8 +22,11 @@ class Dashboard {
   static void onMediaPrevious(lv_event_t* event);
   static void onMediaPlayPause(lv_event_t* event);
   static void onMediaNext(lv_event_t* event);
+  static void onRunPause(lv_event_t* event);
+  static void onRunStop(lv_event_t* event);
 
   void emitMediaControl(MediaControlAction action);
+  void emitRunControl(RunControlAction action);
 
   void show(Screen page);
   void buildDashboard();
@@ -29,6 +34,7 @@ class Dashboard {
   void buildStats();
   void buildReady();
   void buildNotification();
+  void buildRunControls();
   void updateNotificationOverlay();
   void updateDashboard();
 
@@ -41,6 +47,7 @@ class Dashboard {
   Screen page_ = Screen::Dashboard;
   DisplayState state_{};
   bool notificationDismissed_ = false;
+  bool runControlsVisible_ = false;
   void (*mediaControlHandler_)(MediaControlAction, void*) = nullptr;
   void* mediaControlContext_ = nullptr;
 
@@ -61,6 +68,13 @@ class Dashboard {
   lv_obj_t* battery_ = nullptr;
   lv_obj_t* statsClock_ = nullptr;
   lv_obj_t* statsTemperature_ = nullptr;
+  lv_obj_t* statsStatus_ = nullptr;
+  lv_obj_t* statsStatusDetail_ = nullptr;
+  lv_obj_t* statsValues_[8] = {};
+  lv_obj_t* runControls_ = nullptr;
+  lv_obj_t* runPauseButton_ = nullptr;
+  void (*runControlHandler_)(RunControlAction, void*) = nullptr;
+  void* runControlContext_ = nullptr;
 };
 
 }  // namespace rundeck

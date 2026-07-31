@@ -27,6 +27,10 @@ uint32_t lastRenderMs = 0;
 void onMediaControl(rundeck::MediaControlAction action, void*) {
   ble.notifyMediaControl(action);
 }
+
+void onRunControl(rundeck::RunControlAction action, void*) {
+  ble.notifyRunControl(action);
+}
 }
 
 void setup() {
@@ -42,6 +46,7 @@ void setup() {
   }
   dashboard.begin();
   dashboard.setMediaControlHandler(onMediaControl, nullptr);
+  dashboard.setRunControlHandler(onRunControl, nullptr);
   ble.begin();
 }
 

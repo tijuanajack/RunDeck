@@ -115,4 +115,19 @@ class RunDeckProtocolTest {
 
         assertEquals(DeviceEvent.MediaControl(43, RunDeckProtocol.MEDIA_CONTROL_PLAY_PAUSE), event)
     }
+
+    @Test fun `device run control event decodes pause`() {
+        val event = RunDeckProtocol.decodeDeviceEvent(byteArrayOf(
+            1,
+            RunDeckProtocol.DEVICE_EVENT_RUN_CONTROL_TYPE,
+            0x2C,
+            0x00,
+            RunDeckProtocol.RUN_CONTROL_PAUSE,
+            0,
+            0,
+            0,
+        ))
+
+        assertEquals(DeviceEvent.RunControl(44, RunDeckProtocol.RUN_CONTROL_PAUSE), event)
+    }
 }
