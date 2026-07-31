@@ -5,6 +5,7 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.LocationManager
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.rundeck.app.ble.DeviceMediaControl
@@ -101,6 +102,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
         }
         viewModelScope.launch {
             bleClient.deviceRunControls.collect { control ->
+                Log.i("RunDeck", "RunDeck device control received: $control")
                 val action = when (control) {
                     DeviceRunControl.Start -> RunTrackingService.ACTION_START
                     DeviceRunControl.Pause -> RunTrackingService.ACTION_PAUSE
@@ -108,10 +110,14 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
                     DeviceRunControl.Stop -> RunTrackingService.ACTION_STOP
                 }
                 val intent = Intent(getApplication(), RunTrackingService::class.java).setAction(action)
-                if (action == RunTrackingService.ACTION_START) {
-                    getApplication<Application>().startForegroundService(intent)
-                } else {
-                    getApplication<Application>().startService(intent)
+                runCatching {
+                    if (action == RunTrackingService.ACTION_START) {
+                        getApplication<Application>().startForegroundService(intent)
+                    } else {
+                        getApplication<Application>().startService(intent)
+                    }
+                }.onFailure { error ->
+                    Log.e("RunDeck", "Unable to dispatch $action", error)
                 }
             }
         }

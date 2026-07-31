@@ -84,7 +84,8 @@ class RunTrackingService : Service(), LocationListener {
         startedAtMs = SystemClock.elapsedRealtime()
         acquireRunWakeLock()
         startForeground(NOTIFICATION_ID, notification("Acquiring GPS…"))
-        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
+            checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             releaseRunWakeLock()
             RunSession.update(RunUiState(gpsStatus = "LOCATION PERMISSION NEEDED"))
             return

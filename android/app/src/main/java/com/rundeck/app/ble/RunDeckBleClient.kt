@@ -17,6 +17,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.util.Log
 import com.rundeck.app.media.PhoneMediaState
 import com.rundeck.app.notifications.RunDeckNotificationPayload
 import com.rundeck.app.run.RunUiState
@@ -596,6 +597,7 @@ class RunDeckBleClient(context: Context) {
         if (uuid != RunDeckProtocol.DEVICE_EVENT_UUID) return
         runCatching { RunDeckProtocol.decodeDeviceEvent(payload) }
             .onSuccess { event ->
+                Log.i("RunDeck", "Device event received: $event")
                 if (event is DeviceEvent.Ack && event.commandType == RunDeckProtocol.COMMAND_RUN_STATE) {
                     val now = SystemClock.elapsedRealtime()
                     _bridge.value = if (event.status == RunDeckProtocol.ACK_OK) {
@@ -645,6 +647,7 @@ class RunDeckBleClient(context: Context) {
                 }
             }
             .onFailure {
+                Log.e("RunDeck", "Device event rejected", it)
                 _bridge.value = _bridge.value.copy(lastError = "BAD DEVICE EVENT")
                 startMetricsStream()
             }
