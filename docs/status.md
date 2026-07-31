@@ -137,6 +137,9 @@ Last verified: 2026-07-30.
   phone, so the Messages card's ALL APPS / SELECTED controls and source rows
   are reachable on a full-height device. Android tests/build and install/launch
   passed on 2026-07-31.
+- Notification end-to-end verification: the user confirmed a new test message
+  appeared on RunDeck after selecting the message source. The phone listener,
+  allowlist, BLE notification write, and device overlay are working together.
 - The selected V1 Long Run target is 8:50–9:20 /mi. Android derives
   `ON TARGET`, `EASE OFF`, `PICK IT UP`, or `GPS WEAK` and sends that state to
   the display. Active-run distance, elapsed time, and pace are checkpointed
