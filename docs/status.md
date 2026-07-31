@@ -178,9 +178,9 @@ Last verified: 2026-07-30.
   Android tests/build and APK install/launch passed on 2026-07-31.
 - Direct-device HR checkpoint: firmware now contains a standard `0x180D` /
   `0x2A37` NimBLE central client with bounded scan/reconnect and stale clearing.
-  It is compiled but explicitly disabled in shipped firmware until the
-  concurrent ESP32 central/peripheral soak gate passes; phone-forwarded HR
-  remains the active default.
+  The current test image has the client enabled for the concurrent-role soak;
+  revert to the disabled gate if any phone BLE, UI, or cold-boot regression
+  appears. Phone-forwarded HR remains the app default.
 - Environment context checkpoint: Android now formats local time and fetches
   current Fahrenheit temperature from Open-Meteo using the active GPS fix,
   caching it with a ten-minute refresh limit and explicit stale/unavailable

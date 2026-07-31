@@ -21,6 +21,7 @@
 // OLED reset through TCA9554 EXIO0, and touch reset through EXIO1.
 // See AGENTS.md and docs/status.md before changing hardware startup.
 namespace {
+constexpr bool kDirectHrSoakEnabled = true;
 rundeck::SimulatedData simulator;
 rundeck::Dashboard dashboard;
 rundeck::RunDeckBle ble;
@@ -57,7 +58,7 @@ void setup() {
   dashboard.setNotificationDismissHandler(onNotificationDismiss, nullptr);
   ble.begin();
   directHr.begin();
-  directHr.setEnabled(false);  // Enable only after the concurrent-role soak gate.
+  directHr.setEnabled(kDirectHrSoakEnabled);
 }
 
 void loop() {
@@ -78,6 +79,13 @@ void loop() {
       state.elapsedSeconds = 0;
       state.heartRateBpm = 0;
       state.statusText = "PHONE OFFLINE";
+    }
+    if (kDirectHrSoakEnabled && directHr.fresh(now)) {
+      state.heartRate = {rundeck::SourceState::Connected, now};
+      state.heartRateBpm = directHr.bpm();
+      state.metricFlags &= static_cast<uint16_t>(~0x00C0);
+      if (state.heartRateBpm > 150) state.metricFlags |= 0x0080;
+      else if (state.heartRateBpm < 135) state.metricFlags |= 0x0040;
     }
     ble.applyRunState(&state, now);
     ble.applyMediaState(&state, now);
