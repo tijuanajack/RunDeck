@@ -157,6 +157,11 @@ Last verified: 2026-07-30.
   notification filters, and background-run card now live in the `device`
   package, while shared RunDeck colors and connection primitives live in
   `ui/RunDeckComponents.kt`. The Compose activity remains the navigation host.
+- HR ownership checkpoint: Device Setup now persists an explicit
+  `PhoneForwardedHr`, `PhoneOnly`, or `DirectDeviceHr` mode. Phone-forwarded
+  HR remains the compatibility default; PhoneOnly and DirectDeviceHr send no
+  HR value until a matching source is actually available. The display still
+  renders unavailable HR as `--` / `GARMIN STRAP OFF`.
 - Environment context checkpoint: Android now formats local time and fetches
   current Fahrenheit temperature from Open-Meteo using the active GPS fix,
   caching it with a ten-minute refresh limit and explicit stale/unavailable
@@ -208,8 +213,9 @@ Last verified: 2026-07-30.
   settings and heartbeat contracts are not implemented end-to-end.
 - Heart rate remains optional. Live phone-GPS runs display the Garmin strap as
   off/unavailable until an actual HR source is connected. Garmin HRM-Dual
-  direct mode, concurrent central/peripheral soak testing, and phone-forwarded
-  HR remain future work.
+  direct mode, concurrent central/peripheral soak testing, and a real
+  phone-forwarded HR source remain future work; the ownership selector and
+  safe packet gating are now in place.
 - Fragmented long notifications,
   weather location before a run, touch lock, brightness/power work, and
   real-run outdoor validation remain future work. App-level message-source

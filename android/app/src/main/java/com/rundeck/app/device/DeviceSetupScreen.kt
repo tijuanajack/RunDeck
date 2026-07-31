@@ -30,6 +30,7 @@ import com.rundeck.app.ble.DeviceConnection
 import com.rundeck.app.ble.DiscoveredRunDeck
 import com.rundeck.app.media.PhoneMediaState
 import com.rundeck.app.notifications.RunDeckNotificationSettings
+import com.rundeck.app.run.HrOwnershipMode
 import com.rundeck.app.ui.Amber
 import com.rundeck.app.ui.Black
 import com.rundeck.app.ui.BrandHeader
@@ -59,6 +60,8 @@ fun DeviceSetupScreen(
     onNotificationContactsAll: (Boolean) -> Unit,
     onNotificationSourceAllowed: (String, Boolean) -> Unit,
     onNotificationContactAllowed: (String, String, Boolean) -> Unit,
+    hrOwnership: HrOwnershipMode,
+    onHrOwnershipMode: (HrOwnershipMode) -> Unit,
     backgroundRunAllowed: Boolean,
     onAllowBackgroundRuns: () -> Unit,
 ) = Column(
@@ -80,9 +83,28 @@ fun DeviceSetupScreen(
     NotificationCard(notifications, onEnableMedia, onNotificationForwarding, onNotificationAllowAll, onNotificationContactsAll, onNotificationSourceAllowed, onNotificationContactAllowed)
     Spacer(Modifier.height(14.dp))
     ResilienceCard(backgroundRunAllowed, onAllowBackgroundRuns)
+    Spacer(Modifier.height(14.dp))
+    HrModeCard(hrOwnership, onHrOwnershipMode)
     if (connection is DeviceConnection.Ready) {
         Spacer(Modifier.height(24.dp))
         PrimaryButton("CONTINUE TO RUN SETUP", onContinue)
+    }
+}
+
+@Composable
+private fun HrModeCard(mode: HrOwnershipMode, onMode: (HrOwnershipMode) -> Unit) = Column(Modifier.fillMaxWidth().background(Color(0xFF080A0D), RoundedCornerShape(16.dp)).padding(18.dp)) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        androidx.compose.material3.Text("HEART RATE SOURCE", color = Color(0xFFFF5252), fontSize = 13.sp, letterSpacing = 2.sp)
+        androidx.compose.material3.Text(if (mode == HrOwnershipMode.PhoneForwardedHr) "FORWARDING" else "SAFE", color = if (mode == HrOwnershipMode.PhoneForwardedHr) Lime else Amber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+    }
+    Spacer(Modifier.height(8.dp))
+    androidx.compose.material3.Text("Choose who owns the strap connection. No HR value is shown when the selected source is unavailable.", color = Muted, fontSize = 13.sp)
+    Spacer(Modifier.height(10.dp))
+    HrOwnershipMode.entries.forEach { candidate ->
+        Button(onClick = { onMode(candidate) }, colors = ButtonDefaults.buttonColors(containerColor = if (candidate == mode) Lime else Color(0xFF14232A), contentColor = if (candidate == mode) Black else White), modifier = Modifier.fillMaxWidth().height(42.dp).padding(bottom = 6.dp), shape = RoundedCornerShape(10.dp)) {
+            androidx.compose.material3.Text(candidate.label, fontWeight = FontWeight.Black, fontSize = 12.sp)
+        }
+        if (candidate == mode) androidx.compose.material3.Text(candidate.detail, color = Muted, fontSize = 11.sp, modifier = Modifier.padding(bottom = 4.dp))
     }
 }
 

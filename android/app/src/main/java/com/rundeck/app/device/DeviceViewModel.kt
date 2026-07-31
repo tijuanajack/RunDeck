@@ -16,6 +16,8 @@ import com.rundeck.app.notifications.RunDeckNotificationPreferences
 import com.rundeck.app.run.RunCheckpointStore
 import com.rundeck.app.run.RunSession
 import com.rundeck.app.run.RunTrackingService
+import com.rundeck.app.run.HrOwnershipMode
+import com.rundeck.app.run.HrOwnershipPreferences
 import com.rundeck.app.weather.OpenMeteoWeather
 import com.rundeck.app.weather.WeatherSnapshot
 import kotlinx.coroutines.delay
@@ -42,12 +44,17 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     val bridge = bleClient.bridge
     val media = mediaController.state
     val notifications = RunDeckNotificationPreferences.settings
+    val hrOwnership = HrOwnershipPreferences.mode
 
     init {
         RunDeckNotificationPreferences.initialize(application)
+        HrOwnershipPreferences.initialize(application)
         mediaController.start()
         viewModelScope.launch {
             RunSession.state.collectLatest(bleClient::publishRunState)
+        }
+        viewModelScope.launch {
+            hrOwnership.collectLatest(bleClient::setHrOwnershipMode)
         }
         viewModelScope.launch {
             media.collectLatest(bleClient::publishMediaState)
@@ -130,6 +137,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
         RunDeckNotificationPreferences.setSourceAllowed(getApplication(), packageName, allowed)
     fun setNotificationContactAllowed(packageName: String, sender: String, allowed: Boolean) =
         RunDeckNotificationPreferences.setContactAllowed(getApplication(), packageName, sender, allowed)
+    fun setHrOwnershipMode(mode: HrOwnershipMode) = HrOwnershipPreferences.set(getApplication(), mode)
 
     override fun onCleared() {
         mediaController.close()

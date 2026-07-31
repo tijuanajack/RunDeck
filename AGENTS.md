@@ -139,6 +139,10 @@ planned work.
 - Device setup composables belong under `device/DeviceSetupScreen.kt`; shared
   visual primitives belong under `ui/RunDeckComponents.kt`. Preserve the
   black/lime/cyan visual contract when extracting additional screens.
+- HR ownership is selected by `HrOwnershipPreferences`: default to
+  `PhoneForwardedHr`, but transmit zero/unavailable unless that source has a
+  real reading. `DirectDeviceHr` is a reserved mode behind the Garmin
+  concurrent-role soak gate; never synthesize strap data.
 - Media metadata is now Android-to-device over characteristic `0003` as a
   bounded ASCII CBOR packet sourced from active Android MediaSession
   controllers. The Android app has phone-side previous/play-pause/next buttons,

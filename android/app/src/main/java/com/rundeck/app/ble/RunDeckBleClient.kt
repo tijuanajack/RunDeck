@@ -21,6 +21,7 @@ import com.rundeck.app.media.PhoneMediaState
 import com.rundeck.app.notifications.RunDeckNotificationPayload
 import com.rundeck.app.run.RunUiState
 import com.rundeck.app.run.LongRunTarget
+import com.rundeck.app.run.HrOwnershipMode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -93,6 +94,7 @@ class RunDeckBleClient(context: Context) {
     private var streamingDemoMetrics = false
     private var protocolStarted = false
     private var currentRunState: RunUiState? = null
+    private var hrOwnershipMode = HrOwnershipMode.PhoneForwardedHr
     private var currentMediaState: PhoneMediaState = PhoneMediaState()
     private var currentDisplayContext = DisplayContextPacket("--:--", 2, false)
     private var lastPublishedRunActive: Boolean? = null
@@ -310,6 +312,11 @@ class RunDeckBleClient(context: Context) {
         if (state.active) sendRunMetrics(state)
     }
 
+    fun setHrOwnershipMode(mode: HrOwnershipMode) {
+        hrOwnershipMode = mode
+        currentRunState?.takeIf { it.active }?.let(::sendRunMetrics)
+    }
+
     fun publishMediaState(state: PhoneMediaState) {
         currentMediaState = state
         sendMediaState(state)
@@ -385,7 +392,7 @@ class RunDeckBleClient(context: Context) {
                 movingSeconds = state.movingSeconds,
                 speedCentimetersPerSecond = 0,
                 temperatureDeciF = 0,
-                forwardedHeartRate = state.heartRateBpm ?: 0,
+                forwardedHeartRate = if (hrOwnershipMode == HrOwnershipMode.PhoneForwardedHr) state.heartRateBpm ?: 0 else 0,
             ),
         )
     }
