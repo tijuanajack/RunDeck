@@ -238,10 +238,13 @@ bool decodeRunState(const uint8_t* input, size_t size, RunStateConfig* decoded) 
   RunStateConfig candidate{};
   bool seenVersion = false, seenSequence = false, seenActive = false, seenPreset = false;
   bool seenTarget = false, seenPaceLow = false, seenPaceHigh = false, seenHrLow = false, seenHrHigh = false;
+  uint16_t seenKeys = 0;
 
   for (uint8_t i = 0; i < entries; ++i) {
     uint32_t key = 0;
     if (!reader.readUInt(&key)) return false;
+    if (key > 15 || (seenKeys & (1u << key)) != 0) return false;
+    seenKeys |= static_cast<uint16_t>(1u << key);
     switch (key) {
       case 0: seenVersion = reader.readUInt(&version); break;
       case 1: seenSequence = reader.readUInt(&sequence); break;
@@ -279,10 +282,13 @@ bool decodeMediaState(const uint8_t* input, size_t size, MediaConfig* decoded) {
   MediaConfig candidate{};
   bool seenVersion = false, seenSequence = false, seenAvailable = false, seenPlaying = false;
   bool seenSource = false, seenTitle = false, seenArtist = false;
+  uint16_t seenKeys = 0;
 
   for (uint8_t i = 0; i < entries; ++i) {
     uint32_t key = 0;
     if (!reader.readUInt(&key)) return false;
+    if (key > 15 || (seenKeys & (1u << key)) != 0) return false;
+    seenKeys |= static_cast<uint16_t>(1u << key);
     switch (key) {
       case 0: seenVersion = reader.readUInt(&version); break;
       case 1: seenSequence = reader.readUInt(&sequence); break;
@@ -312,10 +318,13 @@ bool decodeNotification(const uint8_t* input, size_t size, NotificationConfig* d
   uint32_t sequence = 0;
   NotificationConfig candidate{};
   bool seenVersion = false, seenSequence = false, seenApp = false, seenTitle = false, seenBody = false;
+  uint16_t seenKeys = 0;
 
   for (uint8_t i = 0; i < entries; ++i) {
     uint32_t key = 0;
     if (!reader.readUInt(&key)) return false;
+    if (key > 15 || (seenKeys & (1u << key)) != 0) return false;
+    seenKeys |= static_cast<uint16_t>(1u << key);
     switch (key) {
       case 0: seenVersion = reader.readUInt(&version); break;
       case 1: seenSequence = reader.readUInt(&sequence); break;
@@ -342,9 +351,12 @@ bool decodeDisplayContext(const uint8_t* input, size_t size, DisplayContextConfi
   DisplayContextConfig candidate{};
   bool seenVersion = false, seenSequence = false, seenClock = false, seenWeather = false;
   bool seenTempAvailable = false, seenTempOffset = false;
+  uint16_t seenKeys = 0;
   for (uint8_t i = 0; i < entries; ++i) {
     uint32_t key = 0;
     if (!reader.readUInt(&key)) return false;
+    if (key > 15 || (seenKeys & (1u << key)) != 0) return false;
+    seenKeys |= static_cast<uint16_t>(1u << key);
     switch (key) {
       case 0: seenVersion = reader.readUInt(&version); break;
       case 1: seenSequence = reader.readUInt(&sequence); break;
@@ -373,9 +385,12 @@ bool decodeProtocolSettings(const uint8_t* input, size_t size, uint16_t* sequenc
   uint32_t version = 0, decodedSequence = 0, maxFragment = 0, maxNotification = 0;
   bool seenVersion = false, seenSequence = false, seenFragment = false, seenNotification = false, seenBrightness = false;
   uint32_t brightness = 208;
+  uint16_t seenKeys = 0;
   for (uint8_t i = 0; i < entries; ++i) {
     uint32_t key = 0;
     if (!reader.readUInt(&key)) return false;
+    if (key > 15 || (seenKeys & (1u << key)) != 0) return false;
+    seenKeys |= static_cast<uint16_t>(1u << key);
     switch (key) {
       case 0: seenVersion = reader.readUInt(&version); break;
       case 1: seenSequence = reader.readUInt(&decodedSequence); break;

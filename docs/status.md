@@ -214,6 +214,10 @@ Last verified: 2026-07-30.
   but the soak image disrupted RunDeck discovery. The current firmware gate is
   disabled again; phone-forwarded HR remains the active default until the
   concurrency design is revised.
+- Protocol hardening checkpoint: firmware CBOR decoders now reject duplicate
+  integer keys in run-state, media, notification, context, and settings maps
+  before applying any candidate state. The firmware compiled and flashed with
+  the verified Waveshare cold-boot path on 2026-07-31.
 - Environment context checkpoint: Android now formats local time and fetches
   current Fahrenheit temperature from Open-Meteo using the active GPS fix,
   caching it with a ten-minute refresh limit and explicit stale/unavailable
@@ -272,11 +276,10 @@ Last verified: 2026-07-30.
   settings packet. Firmware applies it through the SH8601 `0x51` command only
   after the verified panel initialization path completes.
 - Heart rate remains optional. Live phone-GPS runs display the Garmin strap as
-  off/unavailable until an actual HR source is connected. Garmin HRM-Dual
-  direct mode, concurrent central/peripheral soak testing, and a real
-  phone-forwarded HR source remain future work; the ownership selector and
-  safe packet gating are now in place. Physical strap pairing and a real HR
-  run are the next verification gate.
+  off/unavailable until an actual HR source is connected. Phone-forwarded HR
+  is implemented and parser/discovery-tested. Garmin HRM-Dual direct mode and
+  concurrent central/peripheral soak testing remain future work; the direct
+  firmware gate stays disabled until that reliability test passes.
 - Brightness/power work and
   real-run outdoor validation remain future work. Setup now offers a
   permission-gated recent-phone-location weather seed; the provider still
