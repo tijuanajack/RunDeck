@@ -122,12 +122,17 @@ planned work.
   dedicated paused-state rendering path and device-origin commands over
   characteristic `0005`; do not describe those as complete until they are wired
   and verified.
+- Media metadata is now Android-to-device over characteristic `0003` as a
+  bounded ASCII CBOR packet sourced from active Android MediaSession
+  controllers. The Android app has phone-side previous/play-pause/next buttons,
+  but RunDeck-device-origin media controls are still future work and should be
+  implemented before device-origin run controls per the user's latest order.
 - Device-event `0005` currently exposes run-state ACK as an 8-byte compact
   event. Android reads `0005` after the run-state write completes and shows
-  `PRESET ACCEPTED`; do not reintroduce automatic CCCD notification
-  subscription until Android GATT writes are serialized through an explicit
-  command queue. A Samsung test exposed `prior command is not finished` when
-  notification subscription overlapped the protocol start.
+  `PRESET ACCEPTED`. Android now serializes GATT writes/reads through an
+  explicit operation queue. A Samsung test exposed `prior command is not
+  finished` when notification subscription overlapped the protocol start, so
+  keep future notify subscription work on that queue.
 - For the Long Run target, Android owns the 8:50–9:20 /mi rule. Do not hardcode
   a competing target on the display. Firmware currently renders the target and
   status flags sent by Android.

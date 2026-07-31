@@ -43,6 +43,22 @@ ESP32 display should stay ASCII until the loaded LVGL fonts are expanded.
 | `7` | `hrLowBpm` | uint | Optional HR lower bound. |
 | `8` | `hrHighBpm` | uint | Optional HR upper/ceiling bound. |
 
+`MediaState` payload on `0003` is a bounded CBOR map with unsigned-integer
+keys. Android sources it from active `MediaSession` controllers after the user
+enables RunDeck's notification-listener/media access. Text is sanitized to
+printable ASCII before encoding and firmware rejects oversized, incompatible,
+unknown-key, or replayed packets.
+
+| Key | Field | Type | Notes |
+| --- | --- | --- | --- |
+| `0` | `version` | uint | Must be `1`. |
+| `1` | `sequence` | uint | `0..65535`, monotonic per media stream. |
+| `2` | `available` | bool | True when Android found active media metadata. |
+| `3` | `playing` | bool | True when the selected MediaSession is playing. |
+| `4` | `source` | text | Max 16 bytes; package-derived display source. |
+| `5` | `title` | text | Max 40 bytes. |
+| `6` | `artist` | text | Max 32 bytes. |
+
 Low-frequency CBOR payloads have a 768-byte total limit. Notification text is
 sanitized by Android, truncated to 240 UTF-8 bytes, and fragmented with
 `messageId`, `fragmentIndex`, and `fragmentCount`; firmware permits at most

@@ -105,6 +105,7 @@ void Dashboard::onStart(lv_event_t* event) {
 void Dashboard::show(Screen page) {
   page_ = page;
   pace_ = paceTarget_ = distance_ = elapsed_ = hr_ = hrTarget_ = media_ = nullptr;
+  mediaSource_ = mediaTrack_ = mediaArtist_ = mediaPlayButton_ = musicFooter_ = nullptr;
   notification_ = nullptr;
   lv_obj_clean(content_);
   switch (page_) {
@@ -162,21 +163,22 @@ void Dashboard::buildMusic() {
   lv_obj_t* heading = label(content_, &lv_font_montserrat_36, LV_ALIGN_TOP_LEFT, 24, 18);
   lv_label_set_text(heading, "MUSIC");
   line(content_, 0, 65, 600, kCyan); line(content_, 24, 63, 92, kCyan);
-  lv_obj_t* source = label(content_, &lv_font_montserrat_20, LV_ALIGN_TOP_LEFT, 40, 110, kCyan);
-  lv_label_set_text(source, "GOOSE");
-  lv_obj_t* track = label(content_, &lv_font_montserrat_48, LV_ALIGN_TOP_LEFT, 36, 144);
-  lv_label_set_text(track, "Hungersite");
-  lv_obj_t* artist = label(content_, &lv_font_montserrat_20, LV_ALIGN_TOP_LEFT, 40, 206, kMuted);
-  lv_label_set_text(artist, "Midnight City / M83");
+  mediaSource_ = label(content_, &lv_font_montserrat_20, LV_ALIGN_TOP_LEFT, 40, 110, kCyan);
+  mediaTrack_ = label(content_, &lv_font_montserrat_48, LV_ALIGN_TOP_LEFT, 36, 144);
+  lv_obj_set_width(mediaTrack_, 520);
+  lv_label_set_long_mode(mediaTrack_, LV_LABEL_LONG_DOT);
+  mediaArtist_ = label(content_, &lv_font_montserrat_20, LV_ALIGN_TOP_LEFT, 40, 206, kMuted);
+  lv_obj_set_width(mediaArtist_, 520);
+  lv_label_set_long_mode(mediaArtist_, LV_LABEL_LONG_DOT);
   const char* controls[] = {"PREV", "PAUSE", "NEXT"};
   for (int i = 0; i < 3; ++i) {
     lv_obj_t* control = panel(content_, 24 + i * 194, 258, 170, 78, kCyan);
     lv_obj_t* controlText = label(control, &lv_font_montserrat_20, LV_ALIGN_CENTER, 0, 0);
     lv_label_set_text(controlText, controls[i]);
+    if (i == 1) mediaPlayButton_ = controlText;
   }
   line(content_, 0, 362, 600, kCyan);
-  lv_obj_t* footer = label(content_, &lv_font_montserrat_20, LV_ALIGN_BOTTOM_MID, 0, -28);
-  lv_label_set_text(footer, "8:25 /MI   0.00 MI   00:47   143 BPM");
+  musicFooter_ = label(content_, &lv_font_montserrat_20, LV_ALIGN_BOTTOM_MID, 0, -28);
 }
 
 void Dashboard::buildStats() {
@@ -243,12 +245,35 @@ void Dashboard::buildNotification() {
 }
 
 void Dashboard::updateDashboard() {
+  const char* source = state_.mediaSource ? state_.mediaSource : "PHONE";
+  const char* title = state_.mediaTitle ? state_.mediaTitle : "NO MEDIA";
+  const char* artist = state_.mediaArtist ? state_.mediaArtist : "";
+  char value[96];
+  if (page_ == Screen::Music && mediaTrack_) {
+    lv_label_set_text(mediaSource_, source);
+    lv_label_set_text(mediaTrack_, title);
+    lv_label_set_text(mediaArtist_, artist);
+    lv_label_set_text(mediaPlayButton_, state_.mediaPlaying ? "PAUSE" : "PLAY");
+    char hrValue[12];
+    if (state_.heartRateBpm) snprintf(hrValue, sizeof(hrValue), "%u BPM", state_.heartRateBpm);
+    else snprintf(hrValue, sizeof(hrValue), "-- BPM");
+    if (state_.paceMinutesPerMile <= 0.0f) {
+      snprintf(value, sizeof(value), "--:-- /MI   %.2f MI   %02lu:%02lu   %s",
+               state_.distanceMiles, state_.elapsedSeconds / 60, state_.elapsedSeconds % 60,
+               hrValue);
+    } else {
+      const int totalSeconds = static_cast<int>(lroundf(state_.paceMinutesPerMile * 60.0f));
+      snprintf(value, sizeof(value), "%d:%02d /MI   %.2f MI   %02lu:%02lu   %s",
+               totalSeconds / 60, totalSeconds % 60, state_.distanceMiles,
+               state_.elapsedSeconds / 60, state_.elapsedSeconds % 60,
+               hrValue);
+    }
+    lv_label_set_text(musicFooter_, value);
+    return;
+  }
   if (page_ != Screen::Dashboard || !pace_) return;
   const char* status = state_.statusText ? state_.statusText : "READY";
   const char* target = state_.targetLabel ? state_.targetLabel : "8:50-9:20";
-  const char* title = state_.mediaTitle ? state_.mediaTitle : "MUSIC";
-  const char* artist = state_.mediaArtist ? state_.mediaArtist : "";
-  char value[96];
   if (state_.paceMinutesPerMile <= 0.0f) {
     lv_label_set_text(pace_, "--:--");
   } else {

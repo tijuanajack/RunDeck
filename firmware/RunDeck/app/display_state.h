@@ -28,6 +28,7 @@ struct DisplayState {
   const char* statusText;
   const char* presetName;
   const char* targetLabel;
+  const char* mediaSource;
   const char* mediaTitle;
   const char* mediaArtist;
 };

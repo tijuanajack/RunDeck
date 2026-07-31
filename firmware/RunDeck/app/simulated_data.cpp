@@ -26,6 +26,7 @@ DisplayState SimulatedData::next(uint32_t nowMs) {
       weakGps ? "GPS WEAK" : (strapLost ? "STRAP LOST" : "ON TARGET"),
       "LONG RUN",
       "8:50-9:20",
+      "M83",
       "Midnight City",
       "M83",
   };

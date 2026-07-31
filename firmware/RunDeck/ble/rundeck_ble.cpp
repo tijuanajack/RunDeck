@@ -23,7 +23,9 @@ constexpr size_t kHeaderBytes = 12;
 constexpr size_t kLiveMetricsBytes = 21;
 constexpr size_t kFrameBytes = kHeaderBytes + kLiveMetricsBytes;
 constexpr size_t kRunStateMaxBytes = 128;
+constexpr size_t kMediaMaxBytes = 160;
 constexpr uint32_t kMetricsFreshForMs = 5000;
+constexpr uint32_t kMediaFreshForMs = 30000;
 
 struct LiveMetrics {
   uint16_t flags;
@@ -47,6 +49,15 @@ struct RunStateConfig {
   char targetLabel[29];
 };
 
+struct MediaConfig {
+  bool available;
+  bool playing;
+  uint16_t sequence;
+  char source[17];
+  char title[41];
+  char artist[33];
+};
+
 portMUX_TYPE metricsMux = portMUX_INITIALIZER_UNLOCKED;
 LiveMetrics latest{};
 uint32_t receivedAtMs = 0;
@@ -59,6 +70,11 @@ uint16_t lastRunStateSequence = 0;
 uint32_t runStateReceivedAtMs = 0;
 bool haveRunState = false;
 bool haveRunStateSequence = false;
+MediaConfig latestMedia{false, false, 0, "PHONE", "NO MEDIA", ""};
+uint16_t lastMediaSequence = 0;
+uint32_t mediaReceivedAtMs = 0;
+bool haveMedia = false;
+bool haveMediaSequence = false;
 NimBLECharacteristic* deviceEventCharacteristic = nullptr;
 
 uint16_t u16(const uint8_t* input) { return static_cast<uint16_t>(input[0] | (input[1] << 8)); }
@@ -189,6 +205,40 @@ bool decodeRunState(const uint8_t* input, size_t size, RunStateConfig* decoded) 
   return true;
 }
 
+bool decodeMediaState(const uint8_t* input, size_t size, MediaConfig* decoded) {
+  if (size == 0 || size > kMediaMaxBytes) return false;
+  CborReader reader(input, size);
+  uint8_t entries = 0;
+  if (!reader.readMap(&entries) || entries != 7) return false;
+
+  uint32_t version = 0;
+  uint32_t sequence = 0;
+  MediaConfig candidate{};
+  bool seenVersion = false, seenSequence = false, seenAvailable = false, seenPlaying = false;
+  bool seenSource = false, seenTitle = false, seenArtist = false;
+
+  for (uint8_t i = 0; i < entries; ++i) {
+    uint32_t key = 0;
+    if (!reader.readUInt(&key)) return false;
+    switch (key) {
+      case 0: seenVersion = reader.readUInt(&version); break;
+      case 1: seenSequence = reader.readUInt(&sequence); break;
+      case 2: seenAvailable = reader.readBool(&candidate.available); break;
+      case 3: seenPlaying = reader.readBool(&candidate.playing); break;
+      case 4: seenSource = reader.readText(candidate.source, sizeof(candidate.source)); break;
+      case 5: seenTitle = reader.readText(candidate.title, sizeof(candidate.title)); break;
+      case 6: seenArtist = reader.readText(candidate.artist, sizeof(candidate.artist)); break;
+      default: return false;
+    }
+  }
+  if (!reader.done() || !seenVersion || !seenSequence || !seenAvailable || !seenPlaying ||
+      !seenSource || !seenTitle || !seenArtist) return false;
+  if (version != kProtocolVersion || sequence > 0xFFFF) return false;
+  candidate.sequence = static_cast<uint16_t>(sequence);
+  *decoded = candidate;
+  return true;
+}
+
 void notifyAck(uint16_t sequence, uint8_t commandType, uint8_t status) {
   if (!deviceEventCharacteristic) return;
   const uint8_t payload[] = {
@@ -261,6 +311,28 @@ class RunStateCallbacks : public NimBLECharacteristicCallbacks {
 
 RunStateCallbacks runStateCallbacks;
 
+class MediaCallbacks : public NimBLECharacteristicCallbacks {
+  void onWrite(NimBLECharacteristic* characteristic, NimBLEConnInfo&) override {
+    const std::string value = characteristic->getValue();
+    MediaConfig decoded{};
+    if (!decodeMediaState(reinterpret_cast<const uint8_t*>(value.data()), value.size(), &decoded)) return;
+
+    portENTER_CRITICAL(&metricsMux);
+    const bool replayed = haveMediaSequence &&
+        static_cast<int16_t>(decoded.sequence - lastMediaSequence) <= 0;
+    if (!replayed) {
+      latestMedia = decoded;
+      lastMediaSequence = decoded.sequence;
+      mediaReceivedAtMs = millis();
+      haveMedia = true;
+      haveMediaSequence = true;
+    }
+    portEXIT_CRITICAL(&metricsMux);
+  }
+};
+
+MediaCallbacks mediaCallbacks;
+
 class ServerCallbacks : public NimBLEServerCallbacks {
   void onDisconnect(NimBLEServer*, NimBLEConnInfo&, int) override {
     NimBLEDevice::startAdvertising();
@@ -285,7 +357,9 @@ void RunDeckBle::begin() {
   NimBLECharacteristic* runState = service->createCharacteristic(
       kRunStateUuid, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR);
   runState->setCallbacks(&runStateCallbacks);
-  addWritable(service, kMediaUuid);
+  NimBLECharacteristic* media = service->createCharacteristic(
+      kMediaUuid, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR);
+  media->setCallbacks(&mediaCallbacks);
   addWritable(service, kNotificationUuid);
   deviceEventCharacteristic = service->createCharacteristic(
       kDeviceEventUuid, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY | NIMBLE_PROPERTY::WRITE);
@@ -309,6 +383,35 @@ void RunDeckBle::applyRunState(DisplayState* state, uint32_t nowMs) {
     state->targetLabel = latestRunState.targetLabel;
   }
   portEXIT_CRITICAL(&metricsMux);
+}
+
+void RunDeckBle::applyMediaState(DisplayState* state, uint32_t nowMs) {
+  MediaConfig media{};
+  uint32_t receivedAt = 0;
+  bool valid = false;
+  portENTER_CRITICAL(&metricsMux);
+  valid = haveMedia;
+  media = latestMedia;
+  receivedAt = mediaReceivedAtMs;
+  portEXIT_CRITICAL(&metricsMux);
+
+  if (!valid) {
+    state->media = {SourceState::Unavailable, nowMs};
+    state->mediaPlaying = false;
+    state->mediaSource = "PHONE";
+    state->mediaTitle = "NO MEDIA";
+    state->mediaArtist = "";
+    return;
+  }
+
+  const bool fresh = nowMs - receivedAt <= kMediaFreshForMs;
+  state->media = {fresh ? (media.available ? SourceState::Connected : SourceState::Unavailable)
+                        : SourceState::Stale,
+                  receivedAt};
+  state->mediaPlaying = fresh && media.available && media.playing;
+  state->mediaSource = fresh ? media.source : "PHONE";
+  state->mediaTitle = fresh ? (media.available ? media.title : "NO MEDIA") : "MEDIA STALE";
+  state->mediaArtist = fresh ? media.artist : "";
 }
 
 bool RunDeckBle::applyLiveMetrics(DisplayState* state, uint32_t nowMs) {

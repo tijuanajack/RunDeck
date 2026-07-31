@@ -24,6 +24,7 @@ object RunDeckProtocol {
     const val LIVE_METRICS_BYTES = 21
     const val DEVICE_EVENT_ACK_BYTES = 8
     const val MAX_RUN_STATE_BYTES = 128
+    const val MAX_MEDIA_STATE_BYTES = 160
 
     private const val RUN_KEY_VERSION = 0
     private const val RUN_KEY_SEQUENCE = 1
@@ -34,6 +35,14 @@ object RunDeckProtocol {
     private const val RUN_KEY_PACE_HIGH_SECONDS = 6
     private const val RUN_KEY_HR_LOW = 7
     private const val RUN_KEY_HR_HIGH = 8
+
+    private const val MEDIA_KEY_VERSION = 0
+    private const val MEDIA_KEY_SEQUENCE = 1
+    private const val MEDIA_KEY_AVAILABLE = 2
+    private const val MEDIA_KEY_PLAYING = 3
+    private const val MEDIA_KEY_SOURCE = 4
+    private const val MEDIA_KEY_TITLE = 5
+    private const val MEDIA_KEY_ARTIST = 6
 
     fun encodeLiveMetrics(sequence: Int, sourceMonotonicMs: Long, metrics: LiveMetrics): ByteArray {
         require(sequence in 0..0xFFFF)
@@ -149,6 +158,61 @@ object RunDeckProtocol {
         return DecodedRunStatePacket(requireNotNull(sequence), decoded)
     }
 
+    fun encodeMediaState(sequence: Int, state: MediaStatePacket): ByteArray {
+        require(sequence in 0..0xFFFF)
+        require(state.source.length <= 16)
+        require(state.title.length <= 40)
+        require(state.artist.length <= 32)
+        val output = ByteArrayOutputStream()
+        output.write(0xA7) // fixed CBOR map with 7 integer-keyed entries.
+        output.writeUintEntry(MEDIA_KEY_VERSION, VERSION.toInt())
+        output.writeUintEntry(MEDIA_KEY_SEQUENCE, sequence)
+        output.writeBoolEntry(MEDIA_KEY_AVAILABLE, state.available)
+        output.writeBoolEntry(MEDIA_KEY_PLAYING, state.playing)
+        output.writeTextEntry(MEDIA_KEY_SOURCE, state.source)
+        output.writeTextEntry(MEDIA_KEY_TITLE, state.title)
+        output.writeTextEntry(MEDIA_KEY_ARTIST, state.artist)
+        return output.toByteArray().also { require(it.size <= MAX_MEDIA_STATE_BYTES) }
+    }
+
+    fun decodeMediaState(payload: ByteArray): DecodedMediaStatePacket {
+        require(payload.size <= MAX_MEDIA_STATE_BYTES) { "Media state too large" }
+        val input = CborInput(payload)
+        val entries = input.readMapEntries()
+        var version: Int? = null
+        var sequence: Int? = null
+        var available: Boolean? = null
+        var playing: Boolean? = null
+        var source: String? = null
+        var title: String? = null
+        var artist: String? = null
+        repeat(entries) {
+            when (input.readUInt()) {
+                MEDIA_KEY_VERSION -> version = input.readUInt()
+                MEDIA_KEY_SEQUENCE -> sequence = input.readUInt()
+                MEDIA_KEY_AVAILABLE -> available = input.readBool()
+                MEDIA_KEY_PLAYING -> playing = input.readBool()
+                MEDIA_KEY_SOURCE -> source = input.readText()
+                MEDIA_KEY_TITLE -> title = input.readText()
+                MEDIA_KEY_ARTIST -> artist = input.readText()
+                else -> error("Unknown media-state key")
+            }
+        }
+        require(!input.hasRemaining()) { "Trailing media-state bytes" }
+        require(version == VERSION.toInt()) { "Incompatible media-state version" }
+        val decoded = MediaStatePacket(
+            available = requireNotNull(available),
+            playing = requireNotNull(playing),
+            source = requireNotNull(source),
+            title = requireNotNull(title),
+            artist = requireNotNull(artist),
+        )
+        require(decoded.source.length <= 16)
+        require(decoded.title.length <= 40)
+        require(decoded.artist.length <= 32)
+        return DecodedMediaStatePacket(requireNotNull(sequence), decoded)
+    }
+
     private fun ByteArrayOutputStream.writeUintEntry(key: Int, value: Int) {
         writeUInt(key)
         writeUInt(value)
@@ -250,3 +314,13 @@ data class RunStatePacket(
 )
 
 data class DecodedRunStatePacket(val sequence: Int, val state: RunStatePacket)
+
+data class MediaStatePacket(
+    val available: Boolean,
+    val playing: Boolean,
+    val source: String,
+    val title: String,
+    val artist: String,
+)
+
+data class DecodedMediaStatePacket(val sequence: Int, val state: MediaStatePacket)

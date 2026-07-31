@@ -5,6 +5,7 @@ import android.app.Application
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -48,6 +49,8 @@ import com.rundeck.app.ble.DeviceConnection
 import com.rundeck.app.ble.DiscoveredRunDeck
 import com.rundeck.app.ble.LiveBridgeStatus
 import com.rundeck.app.ble.RunDeckBleClient
+import com.rundeck.app.media.PhoneMediaController
+import com.rundeck.app.media.PhoneMediaState
 import com.rundeck.app.run.RunSession
 import com.rundeck.app.run.RunTrackingService
 import com.rundeck.app.run.LongRunTarget
@@ -66,19 +69,32 @@ class MainActivity : ComponentActivity() {
 class DeviceViewModel(application: Application) : AndroidViewModel(application) {
     private val bleClient = RunDeckBleClient(application)
     private val checkpoints = RunCheckpointStore(application)
+    private val mediaController = PhoneMediaController(application)
     val devices = bleClient.devices
     val connection = bleClient.connection
     val bridge = bleClient.bridge
+    val media = mediaController.state
     init {
+        mediaController.start()
         viewModelScope.launch {
             RunSession.state.collectLatest(bleClient::publishRunState)
+        }
+        viewModelScope.launch {
+            media.collectLatest(bleClient::publishMediaState)
         }
     }
     fun scan() = bleClient.startScan()
     fun connect(device: DiscoveredRunDeck) = bleClient.connect(device)
     fun sendDemoMetrics() = bleClient.sendDemoMetrics()
     fun discardCheckpoint() = viewModelScope.launch { checkpoints.clear() }
-    override fun onCleared() = bleClient.close()
+    fun refreshMedia() = mediaController.refresh()
+    fun previousTrack() = mediaController.previous()
+    fun playPause() = mediaController.playPause()
+    fun nextTrack() = mediaController.next()
+    override fun onCleared() {
+        mediaController.close()
+        bleClient.close()
+    }
 }
 
 @Composable
@@ -86,6 +102,7 @@ private fun RunDeckApp(viewModel: DeviceViewModel = viewModel()) {
     val devices by viewModel.devices.collectAsState()
     val connection by viewModel.connection.collectAsState()
     val bridge by viewModel.bridge.collectAsState()
+    val media by viewModel.media.collectAsState()
     val run by RunSession.state.collectAsState()
     var showRunSetup by remember { mutableStateOf(false) }
     var checkpoint by remember { mutableStateOf<com.rundeck.app.run.RunUiState?>(null) }
@@ -153,9 +170,16 @@ private fun RunDeckApp(viewModel: DeviceViewModel = viewModel()) {
                     onBack = { showRunSetup = false },
                 )
                 else -> DeviceSetupScreen(
-                    connection, devices, requestBluetooth,
+                    connection, devices, media, requestBluetooth,
                     onConnect = viewModel::connect,
                     onContinue = { showRunSetup = true },
+                    onEnableMedia = {
+                        context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                    },
+                    onRefreshMedia = viewModel::refreshMedia,
+                    onPrevious = viewModel::previousTrack,
+                    onPlayPause = viewModel::playPause,
+                    onNext = viewModel::nextTrack,
                 )
             }
         }
@@ -166,9 +190,15 @@ private fun RunDeckApp(viewModel: DeviceViewModel = viewModel()) {
 private fun DeviceSetupScreen(
     connection: DeviceConnection,
     devices: List<DiscoveredRunDeck>,
+    media: PhoneMediaState,
     onScan: () -> Unit,
     onConnect: (DiscoveredRunDeck) -> Unit,
     onContinue: () -> Unit,
+    onEnableMedia: () -> Unit,
+    onRefreshMedia: () -> Unit,
+    onPrevious: () -> Unit,
+    onPlayPause: () -> Unit,
+    onNext: () -> Unit,
 ) = ScreenColumn {
     BrandHeader("DEVICE SETUP")
     Spacer(Modifier.height(14.dp))
@@ -180,9 +210,42 @@ private fun DeviceSetupScreen(
     Spacer(Modifier.height(10.dp))
     if (devices.isEmpty()) Text("Tap FIND RUNDECK to scan for the RunDeck display.", color = Muted)
     else devices.forEach { device -> DeviceRow(device) { onConnect(device) } }
+    Spacer(Modifier.height(22.dp))
+    MediaCard(media, onEnableMedia, onRefreshMedia, onPrevious, onPlayPause, onNext)
     if (connection is DeviceConnection.Ready) {
         Spacer(Modifier.weight(1f))
         PrimaryButton("CONTINUE TO RUN SETUP", onContinue)
+    }
+}
+
+@Composable
+private fun MediaCard(
+    media: PhoneMediaState,
+    onEnableMedia: () -> Unit,
+    onRefreshMedia: () -> Unit,
+    onPrevious: () -> Unit,
+    onPlayPause: () -> Unit,
+    onNext: () -> Unit,
+) = Column(Modifier.fillMaxWidth().background(Color(0xFF080A0D), RoundedCornerShape(16.dp)).padding(18.dp)) {
+    Text("MUSIC", color = Cyan, fontSize = 13.sp, letterSpacing = 2.sp)
+    Spacer(Modifier.height(8.dp))
+    Text(if (media.available) media.title else "No active media session", color = White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+    Text(if (media.available) "${media.artist.ifBlank { media.source }}  •  ${if (media.playing) "PLAYING" else "PAUSED"}" else "Uses Android MediaSession, not Spotify login.", color = Muted, fontSize = 13.sp)
+    Spacer(Modifier.height(12.dp))
+    if (!media.accessEnabled) {
+        PrimaryButton("ENABLE MEDIA ACCESS", onEnableMedia)
+        Spacer(Modifier.height(8.dp))
+        Button(onClick = onRefreshMedia, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF14232A), contentColor = White), modifier = Modifier.fillMaxWidth().height(44.dp), shape = RoundedCornerShape(12.dp)) {
+            Text("REFRESH AFTER ENABLING", fontWeight = FontWeight.Bold)
+        }
+    } else {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Button(onClick = onPrevious, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF14232A), contentColor = White), modifier = Modifier.weight(1f).height(48.dp)) { Text("PREV", fontWeight = FontWeight.Black) }
+            Button(onClick = onPlayPause, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF14232A), contentColor = White), modifier = Modifier.weight(1f).height(48.dp)) { Text(if (media.playing) "PAUSE" else "PLAY", fontWeight = FontWeight.Black) }
+            Button(onClick = onNext, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF14232A), contentColor = White), modifier = Modifier.weight(1f).height(48.dp)) { Text("NEXT", fontWeight = FontWeight.Black) }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text("If this is stale, start music and tap refresh.", color = Muted, fontSize = 12.sp, modifier = Modifier.clickable(onClick = onRefreshMedia))
     }
 }
 

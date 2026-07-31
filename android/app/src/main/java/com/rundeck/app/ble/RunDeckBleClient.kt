@@ -16,6 +16,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import com.rundeck.app.media.PhoneMediaState
 import com.rundeck.app.run.RunUiState
 import com.rundeck.app.run.LongRunTarget
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,6 +34,7 @@ data class LiveBridgeStatus(
     val lastSequence: Int? = null,
     val lastAttemptMs: Long = 0,
     val lastWriteConfirmedMs: Long = 0,
+    val lastMediaWriteConfirmedMs: Long = 0,
     val lastRunStateAckSequence: Int? = null,
     val lastRunStateAckMs: Long = 0,
     val lastError: String? = null,
@@ -41,6 +43,7 @@ data class LiveBridgeStatus(
         lastError != null -> lastError
         !connected -> "DISPLAY OFFLINE"
         lastRunStateAckMs > 0 && nowMs - lastRunStateAckMs <= 5_000 -> "PRESET ACCEPTED"
+        lastMediaWriteConfirmedMs > 0 && nowMs - lastMediaWriteConfirmedMs <= 3_000 -> "MUSIC → RUNDECK"
         streamingRun && lastWriteConfirmedMs > 0 && nowMs - lastWriteConfirmedMs <= 3_000 -> "PHONE LIVE → RUNDECK"
         streamingRun && lastAttemptMs > 0 -> "SENDING TO RUNDECK…"
         else -> "DISPLAY CONNECTED"
@@ -55,6 +58,16 @@ sealed interface DeviceConnection {
     data class Error(val message: String) : DeviceConnection
 }
 
+private sealed class GattOperation(val label: String) {
+    data class Write(
+        val characteristic: BluetoothGattCharacteristic,
+        val payload: ByteArray,
+        val writeType: Int,
+        val name: String,
+    ) : GattOperation(name)
+    data class Read(val characteristic: BluetoothGattCharacteristic, val name: String) : GattOperation(name)
+}
+
 class RunDeckBleClient(context: Context) {
     private val appContext = context.applicationContext
     private val bluetoothManager = appContext.getSystemService(BluetoothManager::class.java)
@@ -63,12 +76,16 @@ class RunDeckBleClient(context: Context) {
     private var gatt: BluetoothGatt? = null
     private var liveMetrics: BluetoothGattCharacteristic? = null
     private var runState: BluetoothGattCharacteristic? = null
+    private var mediaMetadata: BluetoothGattCharacteristic? = null
     private var deviceEvents: BluetoothGattCharacteristic? = null
     private val demoHandler = Handler(Looper.getMainLooper())
     private var streamingDemoMetrics = false
     private var protocolStarted = false
     private var currentRunState: RunUiState? = null
+    private var currentMediaState: PhoneMediaState = PhoneMediaState()
     private var lastPublishedRunActive: Boolean? = null
+    private val pendingGattOps = ArrayDeque<GattOperation>()
+    private var gattOperationInFlight = false
     private val preferences = appContext.getSharedPreferences("rundeck_ble", Context.MODE_PRIVATE)
     private var rememberedAddress: String? = preferences.getString(KEY_DEVICE_ADDRESS, null)
     private var reconnectAttempts = 0
@@ -123,8 +140,9 @@ class RunDeckBleClient(context: Context) {
             val service: BluetoothGattService? = gatt.getService(RunDeckProtocol.SERVICE_UUID)
             liveMetrics = service?.getCharacteristic(RunDeckProtocol.LIVE_METRICS_UUID)
             runState = service?.getCharacteristic(RunDeckProtocol.RUN_STATE_UUID)
+            mediaMetadata = service?.getCharacteristic(RunDeckProtocol.MEDIA_UUID)
             deviceEvents = service?.getCharacteristic(RunDeckProtocol.DEVICE_EVENT_UUID)
-            _connection.value = if (status == BluetoothGatt.GATT_SUCCESS && liveMetrics != null && runState != null && deviceEvents != null) {
+            _connection.value = if (status == BluetoothGatt.GATT_SUCCESS && liveMetrics != null && runState != null && mediaMetadata != null && deviceEvents != null) {
                 _bridge.value = _bridge.value.copy(connected = true, lastError = null)
                 beginProtocolStream()
                 DeviceConnection.Ready(gatt.device.name ?: "RunDeck")
@@ -135,21 +153,31 @@ class RunDeckBleClient(context: Context) {
         }
 
         override fun onCharacteristicWrite(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) {
-            if (characteristic.uuid == RunDeckProtocol.RUN_STATE_UUID) {
-                if (status == BluetoothGatt.GATT_SUCCESS) readDeviceEventAck()
-                else {
-                    _bridge.value = _bridge.value.copy(lastError = "RUN STATE WRITE FAILED ($status)")
-                    startMetricsStream()
+            when (characteristic.uuid) {
+                RunDeckProtocol.RUN_STATE_UUID -> {
+                    if (status == BluetoothGatt.GATT_SUCCESS) queueDeviceEventAck()
+                    else {
+                        _bridge.value = _bridge.value.copy(lastError = "RUN STATE WRITE FAILED ($status)")
+                        startMetricsStream()
+                    }
                 }
-                return
+                RunDeckProtocol.MEDIA_UUID -> {
+                    _bridge.value = if (status == BluetoothGatt.GATT_SUCCESS) {
+                        _bridge.value.copy(connected = true, lastMediaWriteConfirmedMs = SystemClock.elapsedRealtime(), lastError = null)
+                    } else {
+                        _bridge.value.copy(lastError = "MEDIA WRITE FAILED ($status)")
+                    }
+                }
+                RunDeckProtocol.LIVE_METRICS_UUID -> {
+                    val now = SystemClock.elapsedRealtime()
+                    _bridge.value = if (status == BluetoothGatt.GATT_SUCCESS) {
+                        _bridge.value.copy(connected = true, lastWriteConfirmedMs = now, lastError = null)
+                    } else {
+                        _bridge.value.copy(lastError = "METRIC WRITE FAILED ($status)")
+                    }
+                }
             }
-            if (characteristic.uuid != RunDeckProtocol.LIVE_METRICS_UUID) return
-            val now = SystemClock.elapsedRealtime()
-            _bridge.value = if (status == BluetoothGatt.GATT_SUCCESS) {
-                _bridge.value.copy(connected = true, lastWriteConfirmedMs = now, lastError = null)
-            } else {
-                _bridge.value.copy(lastError = "METRIC WRITE FAILED ($status)")
-            }
+            completeGattOperation()
         }
 
         override fun onCharacteristicChanged(
@@ -171,22 +199,26 @@ class RunDeckBleClient(context: Context) {
             value: ByteArray,
             status: Int,
         ) {
-            if (characteristic.uuid != RunDeckProtocol.DEVICE_EVENT_UUID) return
-            if (status == BluetoothGatt.GATT_SUCCESS) handleDeviceEvent(characteristic.uuid, value)
-            else {
-                _bridge.value = _bridge.value.copy(lastError = "ACK READ FAILED ($status)")
-                startMetricsStream()
+            if (characteristic.uuid == RunDeckProtocol.DEVICE_EVENT_UUID) {
+                if (status == BluetoothGatt.GATT_SUCCESS) handleDeviceEvent(characteristic.uuid, value)
+                else {
+                    _bridge.value = _bridge.value.copy(lastError = "ACK READ FAILED ($status)")
+                    startMetricsStream()
+                }
             }
+            completeGattOperation()
         }
 
         @Suppress("DEPRECATION")
         override fun onCharacteristicRead(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) {
-            if (characteristic.uuid != RunDeckProtocol.DEVICE_EVENT_UUID) return
-            if (status == BluetoothGatt.GATT_SUCCESS) handleDeviceEvent(characteristic.uuid, characteristic.value ?: return)
-            else {
-                _bridge.value = _bridge.value.copy(lastError = "ACK READ FAILED ($status)")
-                startMetricsStream()
+            if (characteristic.uuid == RunDeckProtocol.DEVICE_EVENT_UUID) {
+                if (status == BluetoothGatt.GATT_SUCCESS) handleDeviceEvent(characteristic.uuid, characteristic.value ?: ByteArray(0))
+                else {
+                    _bridge.value = _bridge.value.copy(lastError = "ACK READ FAILED ($status)")
+                    startMetricsStream()
+                }
             }
+            completeGattOperation()
         }
     }
 
@@ -237,9 +269,14 @@ class RunDeckBleClient(context: Context) {
         if (state.active) sendRunMetrics(state)
     }
 
+    fun publishMediaState(state: PhoneMediaState) {
+        currentMediaState = state
+        sendMediaState(state)
+    }
+
     private fun sendRunState(state: RunUiState) {
         val characteristic = runState ?: return
-        val target = gatt ?: return
+        if (gatt == null) return
         val nextSequence = sequence.getAndIncrement() and 0xFFFF
         val payload = RunDeckProtocol.encodeRunState(
             nextSequence,
@@ -254,17 +291,22 @@ class RunDeckBleClient(context: Context) {
             ),
         )
         _bridge.value = _bridge.value.copy(lastRunStateAckSequence = null, lastRunStateAckMs = 0, lastError = null)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            val status = target.writeCharacteristic(characteristic, payload, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT)
-            if (status != 0) _bridge.value = _bridge.value.copy(lastError = "RUN STATE QUEUE FAILED ($status)")
-        } else {
-            characteristic.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-            characteristic.value = payload
-            @Suppress("DEPRECATION")
-            if (!target.writeCharacteristic(characteristic)) {
-                _bridge.value = _bridge.value.copy(lastError = "RUN STATE QUEUE FAILED")
-            }
-        }
+        queueWrite(characteristic, payload, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT, OP_RUN_STATE)
+    }
+
+    private fun sendMediaState(state: PhoneMediaState) {
+        val characteristic = mediaMetadata ?: return
+        val payload = RunDeckProtocol.encodeMediaState(
+            sequence.getAndIncrement() and 0xFFFF,
+            MediaStatePacket(
+                available = state.accessEnabled && state.available,
+                playing = state.accessEnabled && state.available && state.playing,
+                source = state.source.take(16),
+                title = state.title.take(40),
+                artist = state.artist.take(32),
+            ),
+        )
+        queueWrite(characteristic, payload, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT, OP_MEDIA)
     }
 
     private fun sendRunMetrics(state: RunUiState) {
@@ -292,7 +334,7 @@ class RunDeckBleClient(context: Context) {
             return
         }
         val payload = RunDeckProtocol.encodeLiveMetrics(sequence, sourceMs, metrics)
-        val target = gatt ?: run {
+        if (gatt == null) {
             _bridge.value = _bridge.value.copy(connected = false, lastError = "DISPLAY OFFLINE")
             return
         }
@@ -303,17 +345,54 @@ class RunDeckBleClient(context: Context) {
             lastAttemptMs = SystemClock.elapsedRealtime(),
             lastError = null,
         )
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            val status = target.writeCharacteristic(characteristic, payload, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT)
-            if (status != 0) _bridge.value = _bridge.value.copy(lastError = "METRIC QUEUE FAILED ($status)")
-        } else {
-            characteristic.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-            characteristic.value = payload
-            @Suppress("DEPRECATION")
-            if (!target.writeCharacteristic(characteristic)) {
-                _bridge.value = _bridge.value.copy(lastError = "METRIC QUEUE FAILED")
+        queueWrite(characteristic, payload, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT, OP_METRIC)
+    }
+
+    private fun queueWrite(
+        characteristic: BluetoothGattCharacteristic,
+        payload: ByteArray,
+        writeType: Int,
+        label: String,
+    ) {
+        if (label == OP_METRIC) pendingGattOps.removeAll { it.label == OP_METRIC }
+        pendingGattOps.addLast(GattOperation.Write(characteristic, payload, writeType, label))
+        drainGattQueue()
+    }
+
+    private fun queueRead(characteristic: BluetoothGattCharacteristic, label: String) {
+        pendingGattOps.addLast(GattOperation.Read(characteristic, label))
+        drainGattQueue()
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun drainGattQueue() {
+        if (gattOperationInFlight) return
+        val target = gatt ?: return
+        val operation = pendingGattOps.removeFirstOrNull() ?: return
+        gattOperationInFlight = true
+        val queued = when (operation) {
+            is GattOperation.Write -> {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    target.writeCharacteristic(operation.characteristic, operation.payload, operation.writeType) == BluetoothGatt.GATT_SUCCESS
+                } else {
+                    operation.characteristic.writeType = operation.writeType
+                    operation.characteristic.value = operation.payload
+                    @Suppress("DEPRECATION")
+                    target.writeCharacteristic(operation.characteristic)
+                }
             }
+            is GattOperation.Read -> target.readCharacteristic(operation.characteristic)
         }
+        if (!queued) {
+            gattOperationInFlight = false
+            _bridge.value = _bridge.value.copy(lastError = "${operation.label} QUEUE FAILED")
+            demoHandler.post { drainGattQueue() }
+        }
+    }
+
+    private fun completeGattOperation() {
+        gattOperationInFlight = false
+        demoHandler.post { drainGattQueue() }
     }
 
     fun startMetricsStream() {
@@ -335,16 +414,13 @@ class RunDeckBleClient(context: Context) {
         if (protocolStarted) return
         protocolStarted = true
         sendRunState(currentRunState ?: RunUiState())
+        sendMediaState(currentMediaState)
     }
 
     @SuppressLint("MissingPermission")
-    private fun readDeviceEventAck() {
-        val target = gatt ?: return
+    private fun queueDeviceEventAck() {
         val events = deviceEvents ?: return
-        if (!target.readCharacteristic(events)) {
-            _bridge.value = _bridge.value.copy(lastError = "ACK READ QUEUE FAILED")
-            startMetricsStream()
-        }
+        queueRead(events, OP_ACK_READ)
     }
 
     private fun handleDeviceEvent(uuid: UUID, payload: ByteArray) {
@@ -381,7 +457,10 @@ class RunDeckBleClient(context: Context) {
         scanner?.stopScan(scanCallback)
         gatt?.close(); gatt = null; liveMetrics = null
         runState = null
+        mediaMetadata = null
         deviceEvents = null
+        pendingGattOps.clear()
+        gattOperationInFlight = false
         protocolStarted = false
     }
 
@@ -391,7 +470,10 @@ class RunDeckBleClient(context: Context) {
         gatt?.close()
         liveMetrics = null
         runState = null
+        mediaMetadata = null
         deviceEvents = null
+        pendingGattOps.clear()
+        gattOperationInFlight = false
         protocolStarted = false
         _connection.value = DeviceConnection.Connecting(name)
         gatt = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -419,7 +501,10 @@ class RunDeckBleClient(context: Context) {
         if (closedGatt !== gatt) return
         liveMetrics = null
         runState = null
+        mediaMetadata = null
         deviceEvents = null
+        pendingGattOps.clear()
+        gattOperationInFlight = false
         protocolStarted = false
         streamingDemoMetrics = false
         demoHandler.removeCallbacksAndMessages(null)
@@ -439,5 +524,9 @@ class RunDeckBleClient(context: Context) {
     private companion object {
         const val KEY_DEVICE_ADDRESS = "device_address"
         const val MAX_RECONNECT_ATTEMPTS = 5
+        const val OP_RUN_STATE = "RUN STATE"
+        const val OP_METRIC = "METRIC"
+        const val OP_MEDIA = "MEDIA"
+        const val OP_ACK_READ = "ACK READ"
     }
 }

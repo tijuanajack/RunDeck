@@ -12,6 +12,8 @@ class RunDeckBle {
   void begin();
   /** Applies the last accepted Android-owned preset/target config, if present. */
   void applyRunState(DisplayState* state, uint32_t nowMs);
+  /** Applies the last accepted Android MediaSession metadata, if present. */
+  void applyMediaState(DisplayState* state, uint32_t nowMs);
   /** Returns true only when a fresh Android metrics frame was applied. */
   bool applyLiveMetrics(DisplayState* state, uint32_t nowMs);
 };

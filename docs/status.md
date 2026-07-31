@@ -88,6 +88,16 @@ Last verified: 2026-07-30.
   `RESUME CHECKPOINT` and `DISCARD CHECKPOINT`. Android tests/build passed, the
   APK installed, and the app launched without an immediate fatal crash on the
   attached Samsung on 2026-07-30.
+- Music bridge checkpoint: Android now declares a notification-listener service
+  for user-enabled MediaSession access, exposes a Music card with
+  enable/refresh plus previous/play-pause/next controls, serializes GATT
+  operations to avoid Samsung overlapping-command failures, and sends bounded
+  ASCII CBOR media state on characteristic `0003`. Firmware validates/stores
+  that media packet, applies a 30-second freshness window, and renders source,
+  title, artist, and play/pause state on the RunDeck Music screen instead of
+  the previous hardcoded mock. Android tests/build passed; APK install/launch
+  passed; firmware compile and flash to the verified Espressif port were
+  hash-verified on 2026-07-30.
 - The selected V1 Long Run target is 8:50–9:20 /mi. Android derives
   `ON TARGET`, `EASE OFF`, `PICK IT UP`, or `GPS WEAK` and sends that state to
   the display. Active-run distance, elapsed time, and pace are checkpointed
@@ -103,15 +113,17 @@ Last verified: 2026-07-30.
   recovery are not implemented.
 - The device currently receives live metrics and the first bounded CBOR
   run-state/preset packet, and Android can read back the first run-state ACK.
-  Phone-side pause/resume/stop exists, but device-origin pause/resume/stop
-  commands, media, notification, settings, and heartbeat contracts are not
-  implemented end-to-end.
+  Phone-side pause/resume/stop exists, and Android-to-device media metadata is
+  wired. Device-origin media commands, device-origin pause/resume/stop
+  commands, notification, settings, and heartbeat contracts are not implemented
+  end-to-end.
 - Heart rate remains optional. Live phone-GPS runs display the Garmin strap as
   off/unavailable until an actual HR source is connected. Garmin HRM-Dual
   direct mode, concurrent central/peripheral soak testing, and phone-forwarded
   HR remain future work.
-- Media control, notification allowlisting/dismissal, Open-Meteo, touch lock,
-  brightness/power work, and real-run outdoor validation remain future work.
+- Device-origin media control, notification allowlisting/dismissal, Open-Meteo,
+  touch lock, brightness/power work, and real-run outdoor validation remain
+  future work.
 - The scripted flash helper deliberately refuses to choose between multiple
   serial ports. When the phone is also attached, identify the Espressif USB
   JTAG port via `udevadm` and use that explicit port.
@@ -121,10 +133,11 @@ Last verified: 2026-07-30.
 1. Continue BLE/live phone metrics polish and reconnect visibility; re-run the
    full-UI cold-boot gate three times when the user can physically test it.
    Restore factory immediately on any failed cold boot.
-2. Continue V1 run-state protocol: add device-origin pause/resume/stop command
-   flow and show paused state on the display, then revisit notify-based device
-   events after the GATT command queue is explicit.
-3. Add MediaSession metadata/actions and the Music display screen bridge.
+2. Continue music controls: add device-origin previous/play-pause/next events
+   from the RunDeck Music screen to Android now that Android-to-device metadata
+   is wired.
+3. Continue V1 run-state protocol: add device-origin pause/resume/stop command
+   flow and show paused state on the display.
 4. Add notification allowlist, sanitization, modal payloads, and permitted
    dismissal acknowledgements; then add weather freshness, settings, touch
    lock/brightness, resilience tests, and outdoor/power validation.

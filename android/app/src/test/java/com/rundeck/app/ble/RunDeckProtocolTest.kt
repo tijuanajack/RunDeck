@@ -46,6 +46,26 @@ class RunDeckProtocolTest {
         RunDeckProtocol.decodeRunState(ByteArray(RunDeckProtocol.MAX_RUN_STATE_BYTES + 1))
     }
 
+    @Test fun `media state cbor round trip preserves bounded metadata`() {
+        val state = MediaStatePacket(
+            available = true,
+            playing = true,
+            source = "Spotify",
+            title = "Hungersite",
+            artist = "Goose",
+        )
+
+        val decoded = RunDeckProtocol.decodeMediaState(RunDeckProtocol.encodeMediaState(45, state))
+
+        assertEquals(45, decoded.sequence)
+        assertEquals(state, decoded.state)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `oversized media state is rejected`() {
+        RunDeckProtocol.decodeMediaState(ByteArray(RunDeckProtocol.MAX_MEDIA_STATE_BYTES + 1))
+    }
+
     @Test fun `device ack event decodes command and sequence`() {
         val event = RunDeckProtocol.decodeDeviceEvent(byteArrayOf(
             1,
