@@ -6,7 +6,7 @@ import org.junit.Test
 
 class RunDeckProtocolTest {
     @Test fun `live metrics round trip preserves every field`() {
-        val metrics = LiveMetrics(15, 50500, 12345, 72, 70, 320, 780, 143)
+        val metrics = LiveMetrics(15, 505, 12345, 72, 70, 320, 780, 143)
         val decoded = RunDeckProtocol.decodeLiveMetrics(RunDeckProtocol.encodeLiveMetrics(42, 1234, metrics))
         assertEquals(42, decoded.sequence)
         assertEquals(1234, decoded.sourceMonotonicMs)
@@ -44,5 +44,20 @@ class RunDeckProtocolTest {
     @Test(expected = IllegalArgumentException::class)
     fun `oversized run state is rejected`() {
         RunDeckProtocol.decodeRunState(ByteArray(RunDeckProtocol.MAX_RUN_STATE_BYTES + 1))
+    }
+
+    @Test fun `device ack event decodes command and sequence`() {
+        val event = RunDeckProtocol.decodeDeviceEvent(byteArrayOf(
+            1,
+            RunDeckProtocol.DEVICE_EVENT_ACK_TYPE,
+            0x2A,
+            0x00,
+            RunDeckProtocol.COMMAND_RUN_STATE,
+            RunDeckProtocol.ACK_OK,
+            0,
+            0,
+        ))
+
+        assertEquals(DeviceEvent.Ack(42, RunDeckProtocol.COMMAND_RUN_STATE, RunDeckProtocol.ACK_OK), event)
     }
 }

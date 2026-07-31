@@ -51,3 +51,23 @@ four outstanding fragments and expires incomplete messages after 10 seconds.
 Important commands (run state, media command, dismissal, settings write) carry
 a command ID and produce one `0005` acknowledgement containing that ID and a
 success/error code. No notification content is persisted on the device.
+
+`DeviceEvent` payload on `0005` starts with a compact fixed-width ACK event for
+the run-state/preset slice:
+
+`version:u8, event_type:u8, acknowledged_sequence:u16, command_type:u8,
+status:u8, reserved:u16`
+
+Current values:
+
+| Field | Value | Meaning |
+| --- | --- | --- |
+| `version` | `1` | Protocol version. |
+| `event_type` | `0x51` | ACK event. |
+| `command_type` | `2` | Run-state/preset packet on `0002`. |
+| `status` | `0` | Accepted. |
+
+In the current Android prototype, Android reads `0005` after the run-state
+write completes. Firmware stores this ACK after accepting and storing a
+non-replayed run-state packet. The characteristic remains notify-capable for a
+later queued-GATT event stream, but V1 does not rely on CCCD subscription yet.

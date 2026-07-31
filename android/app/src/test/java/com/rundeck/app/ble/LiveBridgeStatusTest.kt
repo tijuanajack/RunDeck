@@ -25,4 +25,15 @@ class LiveBridgeStatusTest {
 
         assertEquals("METRIC WRITE FAILED (133)", status.label(nowMs = 10_000))
     }
+
+    @Test fun `recent run state ack reports preset accepted`() {
+        val status = LiveBridgeStatus(
+            connected = true,
+            streamingRun = true,
+            lastRunStateAckSequence = 42,
+            lastRunStateAckMs = 10_000,
+        )
+
+        assertEquals("PRESET ACCEPTED", status.label(nowMs = 12_000))
+    }
 }

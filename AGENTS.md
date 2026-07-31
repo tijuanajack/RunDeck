@@ -117,6 +117,12 @@ planned work.
   bounds on connect/start/stop changes; firmware validates and stores it, then
   renders the Android-owned target label. Keep display-bound strings ASCII
   unless LVGL font coverage is intentionally expanded.
+- Device-event `0005` currently exposes run-state ACK as an 8-byte compact
+  event. Android reads `0005` after the run-state write completes and shows
+  `PRESET ACCEPTED`; do not reintroduce automatic CCCD notification
+  subscription until Android GATT writes are serialized through an explicit
+  command queue. A Samsung test exposed `prior command is not finished` when
+  notification subscription overlapped the protocol start.
 - For the Long Run target, Android owns the 8:50–9:20 /mi rule. Do not hardcode
   a competing target on the display. Firmware currently renders the target and
   status flags sent by Android.

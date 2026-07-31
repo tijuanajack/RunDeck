@@ -71,6 +71,15 @@ Last verified: 2026-07-30.
   above about 10:55 /mi, to `uint16` seconds-per-mile so walking paces match
   the phone. Android tests/build passed; firmware compile, flash, APK install,
   app launch, and BLE service discovery were verified on 2026-07-30.
+- Run-state ACK checkpoint: firmware now stores an 8-byte ACK event on
+  device-event characteristic `7b2e0005-...` after accepting a non-replayed
+  run-state packet. Android reads that characteristic after the run-state write
+  completes and shows `PRESET ACCEPTED` briefly in the bridge status. A first
+  notification-subscription attempt exposed a Samsung GATT `prior command is
+  not finished` failure, so this slice intentionally uses read-after-write for
+  ACK reliability while leaving `0005` notify-capable for later event work.
+  Android tests/build passed; firmware compile/flash and APK install/launch
+  were verified on 2026-07-30, with clean BLE connect/service-discovery logs.
 - The selected V1 Long Run target is 8:50–9:20 /mi. Android derives
   `ON TARGET`, `EASE OFF`, `PICK IT UP`, or `GPS WEAK` and sends that state to
   the display. Active-run distance, elapsed time, and pace are checkpointed
@@ -85,9 +94,9 @@ Last verified: 2026-07-30.
   feature modules, full preset editing, and active-run recovery/resume UI are
   not implemented.
 - The device currently receives live metrics and the first bounded CBOR
-  run-state/preset packet. Acknowledgements, pause/resume/stop commands,
-  media, notification, settings, and heartbeat contracts are not implemented
-  end-to-end.
+  run-state/preset packet, and Android can read back the first run-state ACK.
+  Pause/resume/stop commands, media, notification, settings, and heartbeat
+  contracts are not implemented end-to-end.
 - Heart rate remains optional. Live phone-GPS runs display the Garmin strap as
   off/unavailable until an actual HR source is connected. Garmin HRM-Dual
   direct mode, concurrent central/peripheral soak testing, and phone-forwarded
@@ -103,8 +112,9 @@ Last verified: 2026-07-30.
 1. Continue BLE/live phone metrics polish and reconnect visibility; re-run the
    full-UI cold-boot gate three times when the user can physically test it.
    Restore factory immediately on any failed cold boot.
-2. Continue V1 run-state protocol: add acknowledgement/event handling,
-   pause/resume/stop command flow, and resume/discard checkpoint UI.
+2. Continue V1 run-state protocol: add pause/resume/stop command flow and
+   resume/discard checkpoint UI, then revisit notify-based device events after
+   the GATT command queue is explicit.
 3. Add MediaSession metadata/actions and the Music display screen bridge.
 4. Add notification allowlist, sanitization, modal payloads, and permitted
    dismissal acknowledgements; then add weather freshness, settings, touch

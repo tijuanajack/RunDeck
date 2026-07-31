@@ -16,6 +16,9 @@ constexpr char kSettingsUuid[] = "7b2e0006-6d1f-4a91-8a5f-6c796a25a000";
 constexpr char kHeartbeatUuid[] = "7b2e0007-6d1f-4a91-8a5f-6c796a25a000";
 constexpr uint8_t kProtocolVersion = 1;
 constexpr uint8_t kLiveMetricsType = 1;
+constexpr uint8_t kDeviceEventAckType = 0x51;
+constexpr uint8_t kCommandRunState = 2;
+constexpr uint8_t kAckOk = 0;
 constexpr size_t kHeaderBytes = 12;
 constexpr size_t kLiveMetricsBytes = 21;
 constexpr size_t kFrameBytes = kHeaderBytes + kLiveMetricsBytes;
@@ -56,6 +59,7 @@ uint16_t lastRunStateSequence = 0;
 uint32_t runStateReceivedAtMs = 0;
 bool haveRunState = false;
 bool haveRunStateSequence = false;
+NimBLECharacteristic* deviceEventCharacteristic = nullptr;
 
 uint16_t u16(const uint8_t* input) { return static_cast<uint16_t>(input[0] | (input[1] << 8)); }
 uint32_t u32(const uint8_t* input) {
@@ -185,6 +189,21 @@ bool decodeRunState(const uint8_t* input, size_t size, RunStateConfig* decoded) 
   return true;
 }
 
+void notifyAck(uint16_t sequence, uint8_t commandType, uint8_t status) {
+  if (!deviceEventCharacteristic) return;
+  const uint8_t payload[] = {
+      kProtocolVersion,
+      kDeviceEventAckType,
+      static_cast<uint8_t>(sequence & 0xFF),
+      static_cast<uint8_t>(sequence >> 8),
+      commandType,
+      status,
+      0,
+      0,
+  };
+  deviceEventCharacteristic->setValue(payload, sizeof(payload));
+}
+
 class LiveMetricsCallbacks : public NimBLECharacteristicCallbacks {
   void onWrite(NimBLECharacteristic* characteristic, NimBLEConnInfo&) override {
     const std::string value = characteristic->getValue();
@@ -226,14 +245,17 @@ class RunStateCallbacks : public NimBLECharacteristicCallbacks {
     portENTER_CRITICAL(&metricsMux);
     const bool replayed = haveRunStateSequence &&
         static_cast<int16_t>(decoded.sequence - lastRunStateSequence) <= 0;
+    bool accepted = false;
     if (!replayed) {
       latestRunState = decoded;
       lastRunStateSequence = decoded.sequence;
       runStateReceivedAtMs = millis();
       haveRunState = true;
       haveRunStateSequence = true;
+      accepted = true;
     }
     portEXIT_CRITICAL(&metricsMux);
+    if (accepted) notifyAck(decoded.sequence, kCommandRunState, kAckOk);
   }
 };
 
@@ -265,7 +287,8 @@ void RunDeckBle::begin() {
   runState->setCallbacks(&runStateCallbacks);
   addWritable(service, kMediaUuid);
   addWritable(service, kNotificationUuid);
-  service->createCharacteristic(kDeviceEventUuid, NIMBLE_PROPERTY::NOTIFY | NIMBLE_PROPERTY::WRITE);
+  deviceEventCharacteristic = service->createCharacteristic(
+      kDeviceEventUuid, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY | NIMBLE_PROPERTY::WRITE);
   service->createCharacteristic(kSettingsUuid, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
   service->createCharacteristic(kHeartbeatUuid, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::NOTIFY);
   service->start();

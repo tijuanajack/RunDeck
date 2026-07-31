@@ -17,8 +17,12 @@ object RunDeckProtocol {
     val HEARTBEAT_UUID: UUID = UUID.fromString("7b2e0007-6d1f-4a91-8a5f-6c796a25a000")
 
     const val LIVE_METRICS_TYPE: Byte = 1
+    const val DEVICE_EVENT_ACK_TYPE: Byte = 0x51
+    const val COMMAND_RUN_STATE: Byte = 2
+    const val ACK_OK: Byte = 0
     const val HEADER_BYTES = 12
     const val LIVE_METRICS_BYTES = 21
+    const val DEVICE_EVENT_ACK_BYTES = 8
     const val MAX_RUN_STATE_BYTES = 128
 
     private const val RUN_KEY_VERSION = 0
@@ -68,6 +72,22 @@ object RunDeckProtocol {
             forwardedHeartRate = input.get().toInt() and 0xFF,
         )
         return DecodedLiveMetrics(sequence, sourceMs, metrics)
+    }
+
+    fun decodeDeviceEvent(frame: ByteArray): DeviceEvent {
+        require(frame.size == DEVICE_EVENT_ACK_BYTES) { "Unexpected device event length" }
+        val input = ByteBuffer.wrap(frame).order(ByteOrder.LITTLE_ENDIAN)
+        require(input.get() == VERSION) { "Incompatible event version" }
+        return when (val type = input.get()) {
+            DEVICE_EVENT_ACK_TYPE -> {
+                val sequence = input.short.toInt() and 0xFFFF
+                val commandType = input.get()
+                val status = input.get()
+                require(input.short.toInt() == 0) { "Unsupported event extension" }
+                DeviceEvent.Ack(sequence, commandType, status)
+            }
+            else -> error("Unknown device event type $type")
+        }
     }
 
     fun encodeRunState(sequence: Int, state: RunStatePacket): ByteArray {
@@ -214,6 +234,10 @@ data class LiveMetrics(
 )
 
 data class DecodedLiveMetrics(val sequence: Int, val sourceMonotonicMs: Long, val metrics: LiveMetrics)
+
+sealed interface DeviceEvent {
+    data class Ack(val acknowledgedSequence: Int, val commandType: Byte, val status: Byte) : DeviceEvent
+}
 
 data class RunStatePacket(
     val active: Boolean,
