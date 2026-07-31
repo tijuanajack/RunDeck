@@ -77,7 +77,8 @@ class Dashboard {
   lv_obj_t* statsValues_[8] = {};
   lv_obj_t* runControls_ = nullptr;
   lv_obj_t* runPauseButton_ = nullptr;
-  lv_obj_t* touchLockOverlay_ = nullptr;
+  lv_obj_t* touchLockButton_ = nullptr;
+  lv_obj_t* touchLockHint_ = nullptr;
   bool touchLocked_ = false;
   bool unlockArmed_ = false;
   void (*runControlHandler_)(RunControlAction, void*) = nullptr;

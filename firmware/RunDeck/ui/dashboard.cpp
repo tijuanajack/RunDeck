@@ -151,7 +151,9 @@ void Dashboard::onRunStop(lv_event_t* event) {
 
 void Dashboard::onTouchLock(lv_event_t* event) {
   auto* self = static_cast<Dashboard*>(lv_event_get_user_data(event));
-  if (self) self->setTouchLocked(!self->touchLocked_);
+  // Locking is a tap action; unlocking remains gesture-only so an accidental
+  // tap cannot defeat the safety lock while the device is being worn.
+  if (self && !self->touchLocked_) self->setTouchLocked(true);
 }
 
 void Dashboard::setMediaControlHandler(void (*handler)(MediaControlAction, void*), void* context) {
@@ -188,9 +190,9 @@ void Dashboard::setTouchLocked(bool locked) {
   unlockArmed_ = false;
   runControlsVisible_ = false;
   if (runControls_) lv_obj_add_flag(runControls_, LV_OBJ_FLAG_HIDDEN);
-  if (touchLockOverlay_) {
-    if (touchLocked_) lv_obj_clear_flag(touchLockOverlay_, LV_OBJ_FLAG_HIDDEN);
-    else lv_obj_add_flag(touchLockOverlay_, LV_OBJ_FLAG_HIDDEN);
+  if (touchLockHint_) {
+    if (touchLocked_) lv_obj_clear_flag(touchLockHint_, LV_OBJ_FLAG_HIDDEN);
+    else lv_obj_add_flag(touchLockHint_, LV_OBJ_FLAG_HIDDEN);
   }
 }
 
@@ -201,7 +203,7 @@ void Dashboard::show(Screen page) {
   clock_ = weather_ = battery_ = statsClock_ = statsTemperature_ = nullptr;
   notification_ = notificationApp_ = notificationTitle_ = notificationBody_ = nullptr;
   runControls_ = runPauseButton_ = nullptr;
-  touchLockOverlay_ = nullptr;
+  touchLockButton_ = touchLockHint_ = nullptr;
   statsStatus_ = statsStatusDetail_ = nullptr;
   for (auto& value : statsValues_) value = nullptr;
   runControlsVisible_ = false;
@@ -249,6 +251,14 @@ void Dashboard::buildDashboard() {
   lv_label_set_text(hrCaption, "HEART RATE");
   hrTarget_ = label(content_, &lv_font_montserrat_14, LV_ALIGN_TOP_MID, 0, 366, kLime);
   line(content_, 0, 380, 600);
+  touchLockButton_ = panel(content_, 268, 387, 64, 26, kAmber);
+  lv_obj_add_flag(touchLockButton_, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_add_event_cb(touchLockButton_, onTouchLock, LV_EVENT_CLICKED, this);
+  lv_obj_t* lockText = label(touchLockButton_, &lv_font_montserrat_14, LV_ALIGN_CENTER, 0, 0, kAmber);
+  lv_label_set_text(lockText, "LOCK");
+  touchLockHint_ = label(content_, &lv_font_montserrat_14, LV_ALIGN_TOP_MID, 0, 418, kAmber);
+  lv_label_set_text(touchLockHint_, "UNLOCK: SWIPE UP, THEN DOWN");
+  lv_obj_add_flag(touchLockHint_, LV_OBJ_FLAG_HIDDEN);
   lv_obj_t* playing = label(content_, &lv_font_montserrat_14, LV_ALIGN_BOTTOM_LEFT, 26, -55, kCyan);
   lv_label_set_text(playing, "NOW PLAYING");
   media_ = label(content_, &lv_font_montserrat_16, LV_ALIGN_BOTTOM_LEFT, 26, -19);
@@ -353,33 +363,20 @@ void Dashboard::buildNotification() {
 }
 
 void Dashboard::buildRunControls() {
-  runControls_ = panel(content_, 88, 92, 424, 194, kLime);
+  runControls_ = panel(content_, 88, 108, 424, 132, kLime);
   lv_obj_add_flag(runControls_, LV_OBJ_FLAG_HIDDEN);
   lv_obj_t* hint = label(runControls_, &lv_font_montserrat_14, LV_ALIGN_TOP_MID, 0, 12, kMuted);
   lv_label_set_text(hint, "RUN CONTROLS");
-  lv_obj_t* pause = panel(runControls_, 18, 40, 180, 62, kCyan);
+  lv_obj_t* pause = panel(runControls_, 18, 42, 180, 70, kCyan);
   lv_obj_add_flag(pause, LV_OBJ_FLAG_CLICKABLE);
   lv_obj_add_event_cb(pause, onRunPause, LV_EVENT_CLICKED, this);
   runPauseButton_ = label(pause, &lv_font_montserrat_20, LV_ALIGN_CENTER, 0, 0);
   lv_label_set_text(runPauseButton_, "PAUSE");
-  lv_obj_t* stop = panel(runControls_, 226, 40, 180, 62, kRed);
+  lv_obj_t* stop = panel(runControls_, 226, 42, 180, 70, kRed);
   lv_obj_add_flag(stop, LV_OBJ_FLAG_CLICKABLE);
   lv_obj_add_event_cb(stop, onRunStop, LV_EVENT_CLICKED, this);
   lv_obj_t* stopText = label(stop, &lv_font_montserrat_20, LV_ALIGN_CENTER, 0, 0);
   lv_label_set_text(stopText, "STOP RUN");
-  lv_obj_t* lock = panel(runControls_, 18, 116, 388, 54, kAmber);
-  lv_obj_add_flag(lock, LV_OBJ_FLAG_CLICKABLE);
-  lv_obj_add_event_cb(lock, onTouchLock, LV_EVENT_CLICKED, this);
-  lv_obj_t* lockText = label(lock, &lv_font_montserrat_16, LV_ALIGN_CENTER, 0, 0, kAmber);
-  lv_label_set_text(lockText, "TOUCH LOCK");
-
-  touchLockOverlay_ = panel(content_, 92, 160, 416, 128, kAmber);
-  lv_obj_add_flag(touchLockOverlay_, LV_OBJ_FLAG_HIDDEN);
-  lv_obj_t* locked = label(touchLockOverlay_, &lv_font_montserrat_20, LV_ALIGN_TOP_MID, 0, 18, kAmber);
-  lv_label_set_text(locked, "TOUCH LOCKED");
-  lv_obj_t* unlock = label(touchLockOverlay_, &lv_font_montserrat_14, LV_ALIGN_TOP_MID, 0, 58, kWhite);
-  lv_label_set_text(unlock, "SWIPE UP, THEN DOWN TO UNLOCK");
-  if (touchLocked_) lv_obj_clear_flag(touchLockOverlay_, LV_OBJ_FLAG_HIDDEN);
 }
 
 void Dashboard::updateNotificationOverlay() {
@@ -473,9 +470,9 @@ void Dashboard::updateDashboard() {
       if (runPauseButton_) lv_label_set_text(runPauseButton_, state_.runPaused ? "RESUME" : "PAUSE");
     }
   }
-  if (touchLockOverlay_) {
-    if (touchLocked_) lv_obj_clear_flag(touchLockOverlay_, LV_OBJ_FLAG_HIDDEN);
-    else lv_obj_add_flag(touchLockOverlay_, LV_OBJ_FLAG_HIDDEN);
+  if (touchLockHint_) {
+    if (touchLocked_) lv_obj_clear_flag(touchLockHint_, LV_OBJ_FLAG_HIDDEN);
+    else lv_obj_add_flag(touchLockHint_, LV_OBJ_FLAG_HIDDEN);
   }
   const char* source = state_.mediaSource ? state_.mediaSource : "PHONE";
   const char* title = state_.mediaTitle ? state_.mediaTitle : "NO MEDIA";

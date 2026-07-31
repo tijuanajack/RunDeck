@@ -254,8 +254,9 @@ Last verified: 2026-07-30.
 3. On the Samsung, review the new BACKGROUND RUNS card and approve the
    battery-optimization exemption before a screen-lock run test. Then add
    permitted contact-level filtering, followed by brightness/power and
-   outdoor validation. The device touch lock is now available from the
-   swipe-up Run Controls panel; it unlocks only with an up-then-down gesture.
+   outdoor validation. The device touch lock is now a compact yellow control
+   below the dashboard HR target; it unlocks only with an up-then-down
+   gesture.
 4. Add optional HR: phone-forwarded HR and target/combined pace-HR status
    rules first, then evaluate direct Garmin HRM-Dual only behind the
    BLE-concurrency soak gate. The strap must be treated as absent when not
