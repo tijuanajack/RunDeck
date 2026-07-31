@@ -156,6 +156,11 @@ planned work.
   device. Firmware reads the Waveshare battery divider on GPIO17 with GPIO16
   battery enable; treat the resulting percentage as provisional until USB-only
   and installed-LiPo ADC readings are recorded.
+- During an active run, `RunTrackingService` holds a partial wake lock and
+  publishes elapsed/moving-time state every second even when GPS callbacks are
+  delayed by a screen lock. Keep the lock scoped to active/resumed runs; a
+  dedicated foreground BLE service and Samsung battery-optimization guidance
+  are still available if real lock tests show GATT dropouts.
 - For the Long Run target, Android owns the 8:50–9:20 /mi rule. Do not hardcode
   a competing target on the display. Firmware currently renders the target and
   status flags sent by Android.

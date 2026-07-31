@@ -11,13 +11,18 @@ import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
 import android.os.IBinder
+import android.os.PowerManager
 import android.os.SystemClock
 import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -53,7 +58,10 @@ class RunTrackingService : Service(), LocationListener {
     private val samples = ArrayDeque<LocationSample>()
     private val paceCalculator = PaceCalculator()
     private val checkpointScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val tickerScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private lateinit var checkpoints: RunCheckpointStore
+    private var metricTicker: Job? = null
+    private var runWakeLock: PowerManager.WakeLock? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -74,8 +82,10 @@ class RunTrackingService : Service(), LocationListener {
 
     private fun startRun() {
         startedAtMs = SystemClock.elapsedRealtime()
+        acquireRunWakeLock()
         startForeground(NOTIFICATION_ID, notification("Acquiring GPS…"))
         if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            releaseRunWakeLock()
             RunSession.update(RunUiState(gpsStatus = "LOCATION PERMISSION NEEDED"))
             return
         }
@@ -83,7 +93,9 @@ class RunTrackingService : Service(), LocationListener {
             locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1_000L, 1f, this)
             locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 2_000L, 2f, this)
             publish(RunUiState(active = true, gpsStatus = "ACQUIRING GPS"))
+            startMetricTicker()
         } catch (_: SecurityException) {
+            releaseRunWakeLock()
             RunSession.update(RunUiState(gpsStatus = "GPS UNAVAILABLE"))
         }
     }
@@ -131,6 +143,9 @@ class RunTrackingService : Service(), LocationListener {
         distanceMeters = 0.0
         previousLocation = null
         samples.clear()
+        metricTicker?.cancel()
+        metricTicker = null
+        releaseRunWakeLock()
         RunSession.update(RunUiState())
         checkpointScope.launch { checkpoints.clear() }
         stopForeground(STOP_FOREGROUND_REMOVE)
@@ -142,6 +157,7 @@ class RunTrackingService : Service(), LocationListener {
         if (!current.active || current.paused) return
         val now = SystemClock.elapsedRealtime()
         pausedAtMs = now
+        releaseRunWakeLock()
         publish(current.copy(
             paused = true,
             elapsedSeconds = ((now - startedAtMs) / 1_000L).coerceAtLeast(current.elapsedSeconds),
@@ -156,8 +172,10 @@ class RunTrackingService : Service(), LocationListener {
         val now = SystemClock.elapsedRealtime()
         if (pausedAtMs > 0) accumulatedPausedMs += now - pausedAtMs
         pausedAtMs = 0L
+        acquireRunWakeLock()
         previousLocation = null
         samples.clear()
+        startMetricTicker()
         publish(current.copy(paused = false, gpsStatus = "GPS LIVE"))
         updateNotification(RunSession.state.value)
     }
@@ -181,12 +199,16 @@ class RunTrackingService : Service(), LocationListener {
             locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 2_000L, 2f, this)
             resumeRun()
         } catch (_: SecurityException) {
+            releaseRunWakeLock()
             publish(current.copy(gpsStatus = "GPS UNAVAILABLE"))
         }
     }
 
     override fun onDestroy() {
         locationManager.removeUpdates(this)
+        metricTicker?.cancel()
+        tickerScope.cancel()
+        releaseRunWakeLock()
         super.onDestroy()
     }
 
@@ -195,6 +217,38 @@ class RunTrackingService : Service(), LocationListener {
     private fun publish(state: RunUiState) {
         RunSession.update(state)
         checkpointScope.launch { checkpoints.save(state) }
+    }
+
+    private fun startMetricTicker() {
+        if (metricTicker?.isActive == true) return
+        metricTicker = tickerScope.launch {
+            while (isActive) {
+                if (startedAtMs == 0L) break
+                val current = RunSession.state.value
+                if (current.active) {
+                    val now = SystemClock.elapsedRealtime()
+                    val elapsed = ((now - startedAtMs) / 1_000L).coerceAtLeast(current.elapsedSeconds)
+                    val moving = if (current.paused) current.movingSeconds
+                    else ((now - startedAtMs - accumulatedPausedMs) / 1_000L).coerceAtLeast(current.movingSeconds)
+                    RunSession.update(current.copy(elapsedSeconds = elapsed, movingSeconds = moving))
+                }
+                delay(1_000L)
+            }
+        }
+    }
+
+    private fun acquireRunWakeLock() {
+        if (runWakeLock?.isHeld == true) return
+        val manager = getSystemService(PowerManager::class.java)
+        runWakeLock = manager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "$packageName:RunTracking").apply {
+            setReferenceCounted(false)
+            acquire()
+        }
+    }
+
+    private fun releaseRunWakeLock() {
+        runWakeLock?.let { if (it.isHeld) it.release() }
+        runWakeLock = null
     }
 
     private fun createNotificationChannel() {
