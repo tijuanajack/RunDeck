@@ -31,6 +31,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -50,6 +51,7 @@ import com.rundeck.app.ble.RunDeckBleClient
 import com.rundeck.app.run.RunSession
 import com.rundeck.app.run.RunTrackingService
 import com.rundeck.app.run.LongRunTarget
+import com.rundeck.app.run.RunCheckpointStore
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -63,6 +65,7 @@ class MainActivity : ComponentActivity() {
 
 class DeviceViewModel(application: Application) : AndroidViewModel(application) {
     private val bleClient = RunDeckBleClient(application)
+    private val checkpoints = RunCheckpointStore(application)
     val devices = bleClient.devices
     val connection = bleClient.connection
     val bridge = bleClient.bridge
@@ -74,6 +77,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     fun scan() = bleClient.startScan()
     fun connect(device: DiscoveredRunDeck) = bleClient.connect(device)
     fun sendDemoMetrics() = bleClient.sendDemoMetrics()
+    fun discardCheckpoint() = viewModelScope.launch { checkpoints.clear() }
     override fun onCleared() = bleClient.close()
 }
 
@@ -84,7 +88,13 @@ private fun RunDeckApp(viewModel: DeviceViewModel = viewModel()) {
     val bridge by viewModel.bridge.collectAsState()
     val run by RunSession.state.collectAsState()
     var showRunSetup by remember { mutableStateOf(false) }
+    var checkpoint by remember { mutableStateOf<com.rundeck.app.run.RunUiState?>(null) }
     val context = androidx.compose.ui.platform.LocalContext.current
+    val checkpointStore = remember { RunCheckpointStore(context) }
+
+    LaunchedEffect(Unit) {
+        checkpoint = checkpointStore.load()
+    }
 
     fun beginRun() {
         val intent = Intent(context, RunTrackingService::class.java).setAction(RunTrackingService.ACTION_START)
@@ -115,9 +125,28 @@ private fun RunDeckApp(viewModel: DeviceViewModel = viewModel()) {
     MaterialTheme {
         Surface(color = Black, modifier = Modifier.fillMaxSize()) {
             when {
-                run.active -> ActiveRunScreen(run, bridge, onStop = {
-                    context.startService(Intent(context, RunTrackingService::class.java).setAction(RunTrackingService.ACTION_STOP))
-                })
+                run.active -> ActiveRunScreen(
+                    run,
+                    bridge,
+                    onPause = { context.startService(Intent(context, RunTrackingService::class.java).setAction(RunTrackingService.ACTION_PAUSE)) },
+                    onResume = { context.startService(Intent(context, RunTrackingService::class.java).setAction(RunTrackingService.ACTION_RESUME)) },
+                    onStop = {
+                        checkpoint = null
+                        context.startService(Intent(context, RunTrackingService::class.java).setAction(RunTrackingService.ACTION_STOP))
+                    },
+                )
+                checkpoint != null -> ResumeRunScreen(
+                    checkpoint = checkpoint!!,
+                    onResume = {
+                        RunSession.restore(checkpoint!!.copy(active = true, paused = true, gpsStatus = "RESUME READY"))
+                        checkpoint = null
+                        showRunSetup = false
+                    },
+                    onDiscard = {
+                        viewModel.discardCheckpoint()
+                        checkpoint = null
+                    },
+                )
                 showRunSetup -> RunSetupScreen(
                     connected = connection is DeviceConnection.Ready,
                     onStart = requestRun,
@@ -177,13 +206,19 @@ private fun RunSetupScreen(connected: Boolean, onStart: () -> Unit, onBack: () -
 }
 
 @Composable
-private fun ActiveRunScreen(state: com.rundeck.app.run.RunUiState, bridge: LiveBridgeStatus, onStop: () -> Unit) = ScreenColumn {
+private fun ActiveRunScreen(
+    state: com.rundeck.app.run.RunUiState,
+    bridge: LiveBridgeStatus,
+    onPause: () -> Unit,
+    onResume: () -> Unit,
+    onStop: () -> Unit,
+) = ScreenColumn {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Text("RUNDECK", color = Lime, fontWeight = FontWeight.Black, letterSpacing = 3.sp)
         Text(bridge.label(), color = if (bridge.lastError == null) Cyan else Amber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
     }
     Spacer(Modifier.height(8.dp))
-    Text(state.gpsStatus, color = Muted, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.align(Alignment.End))
+    Text(if (state.paused) "PAUSED" else state.gpsStatus, color = if (state.paused) Amber else Muted, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.align(Alignment.End))
     Spacer(Modifier.height(22.dp))
     Text("PACE", color = White, fontSize = 22.sp, letterSpacing = 3.sp, modifier = Modifier.align(Alignment.CenterHorizontally))
     Text(RunTrackingService.formatPace(state.paceSecondsPerMile), color = White, fontSize = 58.sp, fontWeight = FontWeight.Black, modifier = Modifier.align(Alignment.CenterHorizontally))
@@ -191,14 +226,45 @@ private fun ActiveRunScreen(state: com.rundeck.app.run.RunUiState, bridge: LiveB
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
         Metric("DISTANCE", "%.2f MI".format(state.distanceMeters / 1609.344))
         Metric("ELAPSED", "%02d:%02d".format(state.elapsedSeconds / 60, state.elapsedSeconds % 60))
+        Metric("MOVING", "%02d:%02d".format(state.movingSeconds / 60, state.movingSeconds % 60))
         Metric("HR STRAP", state.heartRateBpm?.let { "$it BPM" } ?: "OFF")
     }
     Spacer(Modifier.height(20.dp))
     val targetStatus = LongRunTarget.status(state.paceSecondsPerMile)
     Text("TARGET ${LongRunTarget.label}  •  ${targetStatus.label}", color = when (targetStatus) { com.rundeck.app.run.PaceTargetStatus.OnTarget -> Lime; com.rundeck.app.run.PaceTargetStatus.GpsWeak -> Muted; else -> Amber }, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally))
     Spacer(Modifier.weight(1f))
-    Button(onClick = onStop, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF451B1B), contentColor = White), modifier = Modifier.fillMaxWidth().height(56.dp)) {
-        Text("STOP RUN", fontWeight = FontWeight.Black)
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Button(onClick = if (state.paused) onResume else onPause, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF14232A), contentColor = White), modifier = Modifier.weight(1f).height(56.dp)) {
+            Text(if (state.paused) "RESUME" else "PAUSE", fontWeight = FontWeight.Black)
+        }
+        Button(onClick = onStop, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF451B1B), contentColor = White), modifier = Modifier.weight(1f).height(56.dp)) {
+            Text("STOP", fontWeight = FontWeight.Black)
+        }
+    }
+}
+
+@Composable
+private fun ResumeRunScreen(
+    checkpoint: com.rundeck.app.run.RunUiState,
+    onResume: () -> Unit,
+    onDiscard: () -> Unit,
+) = ScreenColumn {
+    BrandHeader("RUN CHECKPOINT")
+    Spacer(Modifier.height(22.dp))
+    Text("A previous run checkpoint is saved locally on this phone.", color = Muted, fontSize = 16.sp)
+    Spacer(Modifier.height(24.dp))
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+        Metric("DISTANCE", "%.2f MI".format(checkpoint.distanceMeters / 1609.344))
+        Metric("ELAPSED", "%02d:%02d".format(checkpoint.elapsedSeconds / 60, checkpoint.elapsedSeconds % 60))
+        Metric("MOVING", "%02d:%02d".format(checkpoint.movingSeconds / 60, checkpoint.movingSeconds % 60))
+    }
+    Spacer(Modifier.height(24.dp))
+    Text("Resume starts paused so you can decide when GPS tracking should continue.", color = Muted, fontSize = 13.sp)
+    Spacer(Modifier.weight(1f))
+    PrimaryButton("RESUME CHECKPOINT", onResume)
+    Spacer(Modifier.height(12.dp))
+    Button(onClick = onDiscard, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF451B1B), contentColor = White), modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(12.dp)) {
+        Text("DISCARD CHECKPOINT", fontWeight = FontWeight.Black)
     }
 }
 

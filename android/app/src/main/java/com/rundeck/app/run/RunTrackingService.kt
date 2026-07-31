@@ -23,7 +23,9 @@ import kotlin.math.roundToInt
 
 data class RunUiState(
     val active: Boolean = false,
+    val paused: Boolean = false,
     val elapsedSeconds: Long = 0,
+    val movingSeconds: Long = 0,
     val distanceMeters: Double = 0.0,
     val paceSecondsPerMile: Double? = null,
     val gpsStatus: String = "GPS READY",
@@ -36,11 +38,14 @@ object RunSession {
     private val mutableState = MutableStateFlow(RunUiState())
     val state = mutableState.asStateFlow()
     internal fun update(value: RunUiState) { mutableState.value = value }
+    fun restore(value: RunUiState) { mutableState.value = value }
 }
 
 class RunTrackingService : Service(), LocationListener {
     private lateinit var locationManager: LocationManager
     private var startedAtMs = 0L
+    private var accumulatedPausedMs = 0L
+    private var pausedAtMs = 0L
     private var distanceMeters = 0.0
     private var previousLocation: Location? = null
     private val samples = ArrayDeque<LocationSample>()
@@ -58,6 +63,8 @@ class RunTrackingService : Service(), LocationListener {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP -> stopRun()
+            ACTION_PAUSE -> pauseRun()
+            ACTION_RESUME -> if (startedAtMs == 0L && RunSession.state.value.active) resumeCheckpoint() else resumeRun()
             else -> if (startedAtMs == 0L) startRun()
         }
         return START_NOT_STICKY
@@ -81,6 +88,14 @@ class RunTrackingService : Service(), LocationListener {
 
     override fun onLocationChanged(location: Location) {
         val now = SystemClock.elapsedRealtime()
+        if (RunSession.state.value.paused) {
+            val current = RunSession.state.value
+            publish(current.copy(
+                elapsedSeconds = ((now - startedAtMs) / 1_000L).coerceAtLeast(current.elapsedSeconds),
+                gpsStatus = "PAUSED",
+            ))
+            return
+        }
         val prior = previousLocation
         if (location.accuracy <= 25f && prior != null) {
             val segment = prior.distanceTo(location).toDouble()
@@ -94,7 +109,10 @@ class RunTrackingService : Service(), LocationListener {
         while (samples.size > 30 || samples.first().elapsedMs < now - 20_000L) samples.removeFirst()
         val pace = paceCalculator.currentPace(samples.toList()).secondsPerMile
         val elapsedSeconds = ((now - startedAtMs) / 1_000L).coerceAtLeast(0)
-        val next = RunUiState(true, elapsedSeconds, distanceMeters, pace, "GPS LIVE")
+        val movingSeconds = ((now - startedAtMs - accumulatedPausedMs) / 1_000L).coerceAtLeast(0)
+        val next = RunUiState(active = true, paused = false, elapsedSeconds = elapsedSeconds,
+            movingSeconds = movingSeconds, distanceMeters = distanceMeters, paceSecondsPerMile = pace,
+            gpsStatus = "GPS LIVE")
         publish(next)
         updateNotification(next)
     }
@@ -105,10 +123,64 @@ class RunTrackingService : Service(), LocationListener {
 
     private fun stopRun() {
         locationManager.removeUpdates(this)
+        startedAtMs = 0L
+        accumulatedPausedMs = 0L
+        pausedAtMs = 0L
+        distanceMeters = 0.0
+        previousLocation = null
+        samples.clear()
         RunSession.update(RunUiState())
         checkpointScope.launch { checkpoints.clear() }
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
+    }
+
+    private fun pauseRun() {
+        val current = RunSession.state.value
+        if (!current.active || current.paused) return
+        val now = SystemClock.elapsedRealtime()
+        pausedAtMs = now
+        publish(current.copy(
+            paused = true,
+            elapsedSeconds = ((now - startedAtMs) / 1_000L).coerceAtLeast(current.elapsedSeconds),
+            gpsStatus = "PAUSED",
+        ))
+        updateNotification(RunSession.state.value)
+    }
+
+    private fun resumeRun() {
+        val current = RunSession.state.value
+        if (!current.active || !current.paused) return
+        val now = SystemClock.elapsedRealtime()
+        if (pausedAtMs > 0) accumulatedPausedMs += now - pausedAtMs
+        pausedAtMs = 0L
+        previousLocation = null
+        samples.clear()
+        publish(current.copy(paused = false, gpsStatus = "GPS LIVE"))
+        updateNotification(RunSession.state.value)
+    }
+
+    private fun resumeCheckpoint() {
+        val current = RunSession.state.value
+        if (!current.active) return
+        startedAtMs = SystemClock.elapsedRealtime() - current.elapsedSeconds * 1_000L
+        accumulatedPausedMs = (current.elapsedSeconds - current.movingSeconds).coerceAtLeast(0) * 1_000L
+        pausedAtMs = SystemClock.elapsedRealtime()
+        distanceMeters = current.distanceMeters
+        previousLocation = null
+        samples.clear()
+        startForeground(NOTIFICATION_ID, notification("Checkpoint ready"))
+        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            publish(current.copy(gpsStatus = "LOCATION PERMISSION NEEDED"))
+            return
+        }
+        try {
+            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1_000L, 1f, this)
+            locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 2_000L, 2f, this)
+            resumeRun()
+        } catch (_: SecurityException) {
+            publish(current.copy(gpsStatus = "GPS UNAVAILABLE"))
+        }
     }
 
     override fun onDestroy() {
@@ -137,14 +209,17 @@ class RunTrackingService : Service(), LocationListener {
 
     private fun updateNotification(state: RunUiState) {
         val miles = state.distanceMeters / 1609.344
+        val status = if (state.paused) "PAUSED" else formatPace(state.paceSecondsPerMile)
         getSystemService(NotificationManager::class.java).notify(
             NOTIFICATION_ID,
-            notification(String.format("%.2f mi  •  %s", miles, formatPace(state.paceSecondsPerMile))),
+            notification(String.format("%.2f mi  •  %s", miles, status)),
         )
     }
 
     companion object {
         const val ACTION_START = "com.rundeck.app.action.START_RUN"
+        const val ACTION_PAUSE = "com.rundeck.app.action.PAUSE_RUN"
+        const val ACTION_RESUME = "com.rundeck.app.action.RESUME_RUN"
         const val ACTION_STOP = "com.rundeck.app.action.STOP_RUN"
         private const val CHANNEL_ID = "active_run"
         private const val NOTIFICATION_ID = 41

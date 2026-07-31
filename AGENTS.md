@@ -117,6 +117,11 @@ planned work.
   bounds on connect/start/stop changes; firmware validates and stores it, then
   renders the Android-owned target label. Keep display-bound strings ASCII
   unless LVGL font coverage is intentionally expanded.
+- Android phone-side run controls now include pause, resume, stop, moving time,
+  and a local resume/discard checkpoint screen. The display still needs a
+  dedicated paused-state rendering path and device-origin commands over
+  characteristic `0005`; do not describe those as complete until they are wired
+  and verified.
 - Device-event `0005` currently exposes run-state ACK as an 8-byte compact
   event. Android reads `0005` after the run-state write completes and shows
   `PRESET ACCEPTED`; do not reintroduce automatic CCCD notification

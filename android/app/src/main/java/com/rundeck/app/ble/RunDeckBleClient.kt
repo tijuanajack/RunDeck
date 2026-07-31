@@ -277,7 +277,7 @@ class RunDeckBleClient(context: Context) {
                 paceSecondsPerMile = pace,
                 distanceCentimeters = (state.distanceMeters * 100).roundToInt().toLong(),
                 elapsedSeconds = state.elapsedSeconds,
-                movingSeconds = state.elapsedSeconds,
+                movingSeconds = state.movingSeconds,
                 speedCentimetersPerSecond = 0,
                 temperatureDeciF = 0,
                 forwardedHeartRate = state.heartRateBpm ?: 0,

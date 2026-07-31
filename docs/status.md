@@ -80,6 +80,14 @@ Last verified: 2026-07-30.
   ACK reliability while leaving `0005` notify-capable for later event work.
   Android tests/build passed; firmware compile/flash and APK install/launch
   were verified on 2026-07-30, with clean BLE connect/service-discovery logs.
+- Android run-control checkpoint: the phone active-run screen now supports
+  pause, resume, and stop actions. Pause freezes moving time while elapsed time
+  can continue, the foreground notification marks paused runs, and the live
+  metrics packet now sends the separate moving-time field. Active checkpoints
+  can be reloaded after app restart into a paused recovery screen with
+  `RESUME CHECKPOINT` and `DISCARD CHECKPOINT`. Android tests/build passed, the
+  APK installed, and the app launched without an immediate fatal crash on the
+  attached Samsung on 2026-07-30.
 - The selected V1 Long Run target is 8:50–9:20 /mi. Android derives
   `ON TARGET`, `EASE OFF`, `PICK IT UP`, or `GPS WEAK` and sends that state to
   the display. Active-run distance, elapsed time, and pace are checkpointed
@@ -91,12 +99,13 @@ Last verified: 2026-07-30.
 ## Current limitations (do not misrepresent as complete)
 
 - The Android app is still a compact single-module prototype. Hilt, Room,
-  feature modules, full preset editing, and active-run recovery/resume UI are
-  not implemented.
+  feature modules, full preset editing, and production-grade checkpoint
+  recovery are not implemented.
 - The device currently receives live metrics and the first bounded CBOR
   run-state/preset packet, and Android can read back the first run-state ACK.
-  Pause/resume/stop commands, media, notification, settings, and heartbeat
-  contracts are not implemented end-to-end.
+  Phone-side pause/resume/stop exists, but device-origin pause/resume/stop
+  commands, media, notification, settings, and heartbeat contracts are not
+  implemented end-to-end.
 - Heart rate remains optional. Live phone-GPS runs display the Garmin strap as
   off/unavailable until an actual HR source is connected. Garmin HRM-Dual
   direct mode, concurrent central/peripheral soak testing, and phone-forwarded
@@ -112,9 +121,9 @@ Last verified: 2026-07-30.
 1. Continue BLE/live phone metrics polish and reconnect visibility; re-run the
    full-UI cold-boot gate three times when the user can physically test it.
    Restore factory immediately on any failed cold boot.
-2. Continue V1 run-state protocol: add pause/resume/stop command flow and
-   resume/discard checkpoint UI, then revisit notify-based device events after
-   the GATT command queue is explicit.
+2. Continue V1 run-state protocol: add device-origin pause/resume/stop command
+   flow and show paused state on the display, then revisit notify-based device
+   events after the GATT command queue is explicit.
 3. Add MediaSession metadata/actions and the Music display screen bridge.
 4. Add notification allowlist, sanitization, modal payloads, and permitted
    dismissal acknowledgements; then add weather freshness, settings, touch
