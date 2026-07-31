@@ -150,6 +150,12 @@ planned work.
   forwarding on/off, all-message-apps mode, selected-sources mode, and local
   persistence for observed/common message apps. Contact allowlisting, Android
   dismissal ack, and fragmentation are not complete.
+- Environment context uses characteristic `0006`: Android sends local
+  `h:mm AM/PM` and Open-Meteo Fahrenheit state every 30 seconds, with weather
+  refreshes capped at 10 minutes and stale/unavailable labels preserved on the
+  device. Firmware reads the Waveshare battery divider on GPIO17 with GPIO16
+  battery enable; treat the resulting percentage as provisional until USB-only
+  and installed-LiPo ADC readings are recorded.
 - For the Long Run target, Android owns the 8:50–9:20 /mi rule. Do not hardcode
   a competing target on the display. Firmware currently renders the target and
   status flags sent by Android.

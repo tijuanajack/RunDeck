@@ -65,6 +65,8 @@ void loop() {
     }
     ble.applyRunState(&state, now);
     ble.applyMediaState(&state, now);
+    ble.applyDisplayContext(&state, now);
+    ble.applyBatteryState(&state, now);
     ble.applyNotificationState(&state, now);
     dashboard.render(state);
     Serial.printf("pace=%.2f hr=%u status=%s\n", state.paceMinutesPerMile,

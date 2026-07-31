@@ -131,6 +131,7 @@ void Dashboard::show(Screen page) {
   page_ = page;
   pace_ = paceTarget_ = distance_ = elapsed_ = hr_ = hrTarget_ = media_ = nullptr;
   mediaSource_ = mediaTrack_ = mediaArtist_ = mediaPlayButton_ = musicFooter_ = nullptr;
+  clock_ = weather_ = battery_ = statsClock_ = statsTemperature_ = nullptr;
   notification_ = notificationApp_ = notificationTitle_ = notificationBody_ = nullptr;
   lv_obj_clean(content_);
   switch (page_) {
@@ -144,12 +145,12 @@ void Dashboard::show(Screen page) {
 }
 
 void Dashboard::buildDashboard() {
-  lv_obj_t* time = label(content_, &lv_font_montserrat_20, LV_ALIGN_TOP_LEFT, 18, 14);
-  lv_label_set_text(time, "10:42 AM");
+  clock_ = label(content_, &lv_font_montserrat_20, LV_ALIGN_TOP_LEFT, 18, 14);
+  lv_label_set_text(clock_, "TIME OFFLINE");
   lv_obj_t* title = label(content_, &lv_font_montserrat_16, LV_ALIGN_TOP_MID, 0, 16, kLime);
   lv_label_set_text(title, "RUNDECK");
-  lv_obj_t* weather = label(content_, &lv_font_montserrat_20, LV_ALIGN_TOP_RIGHT, -18, 14, kAmber);
-  lv_label_set_text(weather, "78F");
+  weather_ = label(content_, &lv_font_montserrat_20, LV_ALIGN_TOP_RIGHT, -18, 14, kAmber);
+  lv_label_set_text(weather_, "--");
   line(content_, 132, 50, 100, kLime); line(content_, 368, 50, 100, kLime);
   lv_obj_t* caption = label(content_, &lv_font_montserrat_28, LV_ALIGN_TOP_MID, 0, 40);
   lv_label_set_text(caption, "PACE");
@@ -180,8 +181,8 @@ void Dashboard::buildDashboard() {
   media_ = label(content_, &lv_font_montserrat_16, LV_ALIGN_BOTTOM_LEFT, 26, -19);
   lv_obj_t* bluetooth = label(content_, &lv_font_montserrat_16, LV_ALIGN_BOTTOM_RIGHT, -116, -26, kCyan);
   lv_label_set_text(bluetooth, "BT");
-  lv_obj_t* battery = label(content_, &lv_font_montserrat_16, LV_ALIGN_BOTTOM_RIGHT, -18, -26);
-  lv_label_set_text(battery, "BAT 82%");
+  battery_ = label(content_, &lv_font_montserrat_16, LV_ALIGN_BOTTOM_RIGHT, -18, -26);
+  lv_label_set_text(battery_, "BAT --");
 }
 
 void Dashboard::buildMusic() {
@@ -213,8 +214,8 @@ void Dashboard::buildMusic() {
 void Dashboard::buildStats() {
   lv_obj_t* heading = label(content_, &lv_font_montserrat_28, LV_ALIGN_TOP_LEFT, 24, 16);
   lv_label_set_text(heading, "RUN STATS");
-  lv_obj_t* clock = label(content_, &lv_font_montserrat_20, LV_ALIGN_TOP_MID, 0, 18);
-  lv_label_set_text(clock, "10:42 AM");
+  statsClock_ = label(content_, &lv_font_montserrat_20, LV_ALIGN_TOP_MID, 0, 18);
+  lv_label_set_text(statsClock_, "TIME OFFLINE");
   const char* names[] = {"PACE", "AVG PACE", "SPEED", "HEART RATE", "HR ZONE", "DISTANCE", "ELAPSED", "TEMP"};
   const char* values[] = {"8:25", "8:32", "7.0", "143", "135-150", "0.00", "00:47", "78F"};
   const char* units[] = {"/MI", "/MI", "MPH", "BPM", "IN ZONE", "MI", "", ""};
@@ -225,6 +226,7 @@ void Dashboard::buildStats() {
     lv_label_set_text(name, names[i]);
     lv_obj_t* value = label(cell, &lv_font_montserrat_28, LV_ALIGN_CENTER, 0, 6);
     lv_label_set_text(value, values[i]);
+    if (i == 7) statsTemperature_ = value;
     lv_obj_t* unit = label(cell, &lv_font_montserrat_14, LV_ALIGN_BOTTOM_MID, 0, -12, i == 4 ? kGreen : kMuted);
     lv_label_set_text(unit, units[i]);
   }
@@ -292,6 +294,35 @@ void Dashboard::updateNotificationOverlay() {
 }
 
 void Dashboard::updateDashboard() {
+  const char* clockLabel = state_.clockLabel ? state_.clockLabel : "TIME OFFLINE";
+  if (clock_ && strcmp(lv_label_get_text(clock_), clockLabel) != 0) lv_label_set_text(clock_, clockLabel);
+  if (statsClock_ && strcmp(lv_label_get_text(statsClock_), clockLabel) != 0) lv_label_set_text(statsClock_, clockLabel);
+  if (statsTemperature_) {
+    char temperature[12];
+    if (state_.weather.state == SourceState::Connected && state_.temperatureF != -128) {
+      snprintf(temperature, sizeof(temperature), "%dF", state_.temperatureF);
+    } else {
+      snprintf(temperature, sizeof(temperature), "--");
+    }
+    if (strcmp(lv_label_get_text(statsTemperature_), temperature) != 0) lv_label_set_text(statsTemperature_, temperature);
+  }
+  if (weather_) {
+    char weather[16];
+    if (state_.weather.state == SourceState::Connected && state_.temperatureF != -128) {
+      snprintf(weather, sizeof(weather), "%dF", state_.temperatureF);
+    } else if (state_.weather.state == SourceState::Stale) {
+      snprintf(weather, sizeof(weather), "TEMP STALE");
+    } else {
+      snprintf(weather, sizeof(weather), "TEMP --");
+    }
+    if (strcmp(lv_label_get_text(weather_), weather) != 0) lv_label_set_text(weather_, weather);
+  }
+  if (battery_) {
+    char battery[16];
+    if (state_.batteryAvailable) snprintf(battery, sizeof(battery), "BAT %u%%", state_.batteryPercent);
+    else snprintf(battery, sizeof(battery), "BAT --");
+    if (strcmp(lv_label_get_text(battery_), battery) != 0) lv_label_set_text(battery_, battery);
+  }
   const char* source = state_.mediaSource ? state_.mediaSource : "PHONE";
   const char* title = state_.mediaTitle ? state_.mediaTitle : "NO MEDIA";
   const char* artist = state_.mediaArtist ? state_.mediaArtist : "";

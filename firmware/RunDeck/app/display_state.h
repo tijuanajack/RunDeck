@@ -34,6 +34,11 @@ struct DisplayState {
   const char* notificationApp;
   const char* notificationTitle;
   const char* notificationBody;
+  FreshValue weather;
+  FreshValue clock;
+  bool batteryAvailable;
+  uint8_t batteryPercent;
+  const char* clockLabel;
 };
 
 }  // namespace rundeck

@@ -31,6 +31,8 @@ data class RunUiState(
     val gpsStatus: String = "GPS READY",
     val heartRateBpm: Int? = null,
     val heartRateStatus: String = "GARMIN STRAP OFF",
+    val latitude: Double? = null,
+    val longitude: Double? = null,
 )
 
 /** Process-local live state. DataStore checkpoints are the next persistence increment. */
@@ -112,7 +114,7 @@ class RunTrackingService : Service(), LocationListener {
         val movingSeconds = ((now - startedAtMs - accumulatedPausedMs) / 1_000L).coerceAtLeast(0)
         val next = RunUiState(active = true, paused = false, elapsedSeconds = elapsedSeconds,
             movingSeconds = movingSeconds, distanceMeters = distanceMeters, paceSecondsPerMile = pace,
-            gpsStatus = "GPS LIVE")
+            gpsStatus = "GPS LIVE", latitude = location.latitude, longitude = location.longitude)
         publish(next)
         updateNotification(next)
     }

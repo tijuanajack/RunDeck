@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include <NimBLEDevice.h>
+#include <math.h>
 #include <string.h>
 
 namespace rundeck {
@@ -26,9 +27,13 @@ constexpr size_t kFrameBytes = kHeaderBytes + kLiveMetricsBytes;
 constexpr size_t kRunStateMaxBytes = 128;
 constexpr size_t kMediaMaxBytes = 160;
 constexpr size_t kNotificationMaxBytes = 192;
+constexpr size_t kDisplayContextMaxBytes = 96;
 constexpr uint32_t kMetricsFreshForMs = 5000;
 constexpr uint32_t kMediaFreshForMs = 30000;
 constexpr uint32_t kNotificationVisibleForMs = 12000;
+constexpr uint32_t kDisplayContextFreshForMs = 90000;
+constexpr uint8_t kBatteryAdcPin = 17;
+constexpr uint8_t kBatteryEnablePin = 16;
 
 struct LiveMetrics {
   uint16_t flags;
@@ -68,6 +73,14 @@ struct NotificationConfig {
   char body[97];
 };
 
+struct DisplayContextConfig {
+  uint16_t sequence;
+  uint8_t weatherState;
+  bool temperatureAvailable;
+  int8_t temperatureF;
+  char clockLabel[9];
+};
+
 portMUX_TYPE metricsMux = portMUX_INITIALIZER_UNLOCKED;
 LiveMetrics latest{};
 uint32_t receivedAtMs = 0;
@@ -90,6 +103,14 @@ uint16_t lastNotificationSequence = 0;
 uint32_t notificationReceivedAtMs = 0;
 bool haveNotification = false;
 bool haveNotificationSequence = false;
+DisplayContextConfig latestDisplayContext{0, 2, false, 0, "--:--"};
+uint16_t lastDisplayContextSequence = 0;
+uint32_t displayContextReceivedAtMs = 0;
+bool haveDisplayContext = false;
+bool haveDisplayContextSequence = false;
+uint32_t batterySampledAtMs = 0;
+uint8_t batteryPercent = 0;
+bool batteryAvailable = false;
 NimBLECharacteristic* deviceEventCharacteristic = nullptr;
 uint16_t deviceEventSequence = 0;
 
@@ -285,6 +306,39 @@ bool decodeNotification(const uint8_t* input, size_t size, NotificationConfig* d
   return true;
 }
 
+bool decodeDisplayContext(const uint8_t* input, size_t size, DisplayContextConfig* decoded) {
+  if (size == 0 || size > kDisplayContextMaxBytes) return false;
+  CborReader reader(input, size);
+  uint8_t entries = 0;
+  if (!reader.readMap(&entries) || entries != 6) return false;
+
+  uint32_t version = 0, sequence = 0, weatherState = 0, temperatureOffset = 0;
+  DisplayContextConfig candidate{};
+  bool seenVersion = false, seenSequence = false, seenClock = false, seenWeather = false;
+  bool seenTempAvailable = false, seenTempOffset = false;
+  for (uint8_t i = 0; i < entries; ++i) {
+    uint32_t key = 0;
+    if (!reader.readUInt(&key)) return false;
+    switch (key) {
+      case 0: seenVersion = reader.readUInt(&version); break;
+      case 1: seenSequence = reader.readUInt(&sequence); break;
+      case 2: seenClock = reader.readText(candidate.clockLabel, sizeof(candidate.clockLabel)); break;
+      case 3: seenWeather = reader.readUInt(&weatherState); break;
+      case 4: seenTempAvailable = reader.readBool(&candidate.temperatureAvailable); break;
+      case 5: seenTempOffset = reader.readUInt(&temperatureOffset); break;
+      default: return false;
+    }
+  }
+  if (!reader.done() || !seenVersion || !seenSequence || !seenClock || !seenWeather ||
+      !seenTempAvailable || !seenTempOffset) return false;
+  if (version != kProtocolVersion || sequence > 0xFFFF || weatherState > 3 || temperatureOffset > 300) return false;
+  candidate.sequence = static_cast<uint16_t>(sequence);
+  candidate.weatherState = static_cast<uint8_t>(weatherState);
+  candidate.temperatureF = static_cast<int8_t>(static_cast<int>(temperatureOffset) - 100);
+  *decoded = candidate;
+  return true;
+}
+
 void notifyAck(uint16_t sequence, uint8_t commandType, uint8_t status) {
   if (!deviceEventCharacteristic) return;
   const uint8_t payload[] = {
@@ -418,6 +472,28 @@ class NotificationCallbacks : public NimBLECharacteristicCallbacks {
 
 NotificationCallbacks notificationCallbacks;
 
+class DisplayContextCallbacks : public NimBLECharacteristicCallbacks {
+  void onWrite(NimBLECharacteristic* characteristic, NimBLEConnInfo&) override {
+    const std::string value = characteristic->getValue();
+    DisplayContextConfig decoded{};
+    if (!decodeDisplayContext(reinterpret_cast<const uint8_t*>(value.data()), value.size(), &decoded)) return;
+
+    portENTER_CRITICAL(&metricsMux);
+    const bool replayed = haveDisplayContextSequence &&
+        static_cast<int16_t>(decoded.sequence - lastDisplayContextSequence) <= 0;
+    if (!replayed) {
+      latestDisplayContext = decoded;
+      lastDisplayContextSequence = decoded.sequence;
+      displayContextReceivedAtMs = millis();
+      haveDisplayContext = true;
+      haveDisplayContextSequence = true;
+    }
+    portEXIT_CRITICAL(&metricsMux);
+  }
+};
+
+DisplayContextCallbacks displayContextCallbacks;
+
 class ServerCallbacks : public NimBLEServerCallbacks {
   void onDisconnect(NimBLEServer*, NimBLEConnInfo&, int) override {
     NimBLEDevice::startAdvertising();
@@ -450,8 +526,14 @@ void RunDeckBle::begin() {
   notification->setCallbacks(&notificationCallbacks);
   deviceEventCharacteristic = service->createCharacteristic(
       kDeviceEventUuid, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY | NIMBLE_PROPERTY::WRITE);
-  service->createCharacteristic(kSettingsUuid, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
+  NimBLECharacteristic* settings = service->createCharacteristic(
+      kSettingsUuid, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR);
+  settings->setCallbacks(&displayContextCallbacks);
   service->createCharacteristic(kHeartbeatUuid, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::NOTIFY);
+  pinMode(kBatteryEnablePin, OUTPUT);
+  digitalWrite(kBatteryEnablePin, HIGH);
+  analogReadResolution(12);
+  analogSetPinAttenuation(kBatteryAdcPin, ADC_11db);
   service->start();
   NimBLEAdvertising* advertising = NimBLEDevice::getAdvertising();
   advertising->setName("RunDeck");
@@ -537,6 +619,40 @@ void RunDeckBle::applyNotificationState(DisplayState* state, uint32_t nowMs) {
     state->notificationTitle = title;
     state->notificationBody = body;
   }
+}
+
+void RunDeckBle::applyDisplayContext(DisplayState* state, uint32_t nowMs) {
+  DisplayContextConfig context{};
+  uint32_t receivedAt = 0;
+  bool valid = false;
+  portENTER_CRITICAL(&metricsMux);
+  valid = haveDisplayContext;
+  context = latestDisplayContext;
+  receivedAt = displayContextReceivedAtMs;
+  portEXIT_CRITICAL(&metricsMux);
+
+  const bool fresh = valid && nowMs - receivedAt <= kDisplayContextFreshForMs;
+  state->clock = {fresh ? SourceState::Connected : SourceState::Stale, receivedAt};
+  state->weather = {fresh ? static_cast<SourceState>(context.weatherState) : SourceState::Stale, receivedAt};
+  state->clockLabel = fresh ? context.clockLabel : "TIME OFFLINE";
+  state->temperatureF = (fresh && context.temperatureAvailable) ? context.temperatureF : -128;
+}
+
+void RunDeckBle::applyBatteryState(DisplayState* state, uint32_t nowMs) {
+  if (nowMs - batterySampledAtMs >= 30000 || batterySampledAtMs == 0) {
+    batterySampledAtMs = nowMs;
+    const uint32_t adcMillivolts = analogReadMilliVolts(kBatteryAdcPin);
+    const float batteryVolts = (adcMillivolts * 3.0f) / 1000.0f;
+    if (batteryVolts >= 3.0f && batteryVolts <= 5.5f) {
+      const float fraction = (batteryVolts - 3.30f) / (4.20f - 3.30f);
+      batteryPercent = static_cast<uint8_t>(constrain(lroundf(fraction * 100.0f), 0L, 100L));
+      batteryAvailable = true;
+    } else {
+      batteryAvailable = false;
+    }
+  }
+  state->batteryAvailable = batteryAvailable;
+  state->batteryPercent = batteryPercent;
 }
 
 void RunDeckBle::notifyMediaControl(MediaControlAction action) {

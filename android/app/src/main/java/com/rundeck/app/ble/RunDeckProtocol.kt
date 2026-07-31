@@ -30,6 +30,7 @@ object RunDeckProtocol {
     const val MAX_RUN_STATE_BYTES = 128
     const val MAX_MEDIA_STATE_BYTES = 160
     const val MAX_NOTIFICATION_BYTES = 192
+    const val MAX_DISPLAY_CONTEXT_BYTES = 96
 
     private const val RUN_KEY_VERSION = 0
     private const val RUN_KEY_SEQUENCE = 1
@@ -54,6 +55,13 @@ object RunDeckProtocol {
     private const val NOTIFICATION_KEY_APP = 2
     private const val NOTIFICATION_KEY_TITLE = 3
     private const val NOTIFICATION_KEY_BODY = 4
+
+    private const val CONTEXT_KEY_VERSION = 0
+    private const val CONTEXT_KEY_SEQUENCE = 1
+    private const val CONTEXT_KEY_CLOCK = 2
+    private const val CONTEXT_KEY_WEATHER_STATE = 3
+    private const val CONTEXT_KEY_TEMPERATURE_AVAILABLE = 4
+    private const val CONTEXT_KEY_TEMPERATURE_OFFSET = 5
 
     fun encodeLiveMetrics(sequence: Int, sourceMonotonicMs: Long, metrics: LiveMetrics): ByteArray {
         require(sequence in 0..0xFFFF)
@@ -247,6 +255,23 @@ object RunDeckProtocol {
         return output.toByteArray().also { require(it.size <= MAX_NOTIFICATION_BYTES) }
     }
 
+    /** Phone-owned clock/weather context, refreshed while the display is connected. */
+    fun encodeDisplayContext(sequence: Int, context: DisplayContextPacket): ByteArray {
+        require(sequence in 0..0xFFFF)
+        require(context.clock.length in 1..8)
+        require(context.weatherState in 0..3)
+        require(!context.temperatureAvailable || context.temperatureF in -100..200)
+        val output = ByteArrayOutputStream()
+        output.write(0xA6)
+        output.writeUintEntry(CONTEXT_KEY_VERSION, VERSION.toInt())
+        output.writeUintEntry(CONTEXT_KEY_SEQUENCE, sequence)
+        output.writeTextEntry(CONTEXT_KEY_CLOCK, context.clock)
+        output.writeUintEntry(CONTEXT_KEY_WEATHER_STATE, context.weatherState)
+        output.writeBoolEntry(CONTEXT_KEY_TEMPERATURE_AVAILABLE, context.temperatureAvailable)
+        output.writeUintEntry(CONTEXT_KEY_TEMPERATURE_OFFSET, context.temperatureF + 100)
+        return output.toByteArray().also { require(it.size <= MAX_DISPLAY_CONTEXT_BYTES) }
+    }
+
     private fun ByteArrayOutputStream.writeUintEntry(key: Int, value: Int) {
         writeUInt(key)
         writeUInt(value)
@@ -364,4 +389,12 @@ data class NotificationPacket(
     val app: String,
     val title: String,
     val body: String,
+)
+
+data class DisplayContextPacket(
+    val clock: String,
+    /** 0 connected, 1 stale, 2 unavailable, 3 error. */
+    val weatherState: Int,
+    val temperatureAvailable: Boolean,
+    val temperatureF: Int = 0,
 )

@@ -52,6 +52,7 @@ import com.rundeck.app.ble.DeviceMediaControl
 import com.rundeck.app.ble.DiscoveredRunDeck
 import com.rundeck.app.ble.LiveBridgeStatus
 import com.rundeck.app.ble.RunDeckBleClient
+import com.rundeck.app.ble.DisplayContextPacket
 import com.rundeck.app.media.PhoneMediaController
 import com.rundeck.app.media.PhoneMediaState
 import com.rundeck.app.notifications.RunDeckNotificationBridge
@@ -61,9 +62,15 @@ import com.rundeck.app.run.RunSession
 import com.rundeck.app.run.RunTrackingService
 import com.rundeck.app.run.LongRunTarget
 import com.rundeck.app.run.RunCheckpointStore
+import com.rundeck.app.weather.OpenMeteoWeather
+import com.rundeck.app.weather.WeatherSnapshot
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -77,6 +84,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     private val bleClient = RunDeckBleClient(application)
     private val checkpoints = RunCheckpointStore(application)
     private val mediaController = PhoneMediaController(application)
+    private val weatherProvider = OpenMeteoWeather()
     val devices = bleClient.devices
     val connection = bleClient.connection
     val bridge = bleClient.bridge
@@ -104,6 +112,32 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
             RunDeckNotificationBridge.events.collect { payload ->
                 bleClient.publishNotification(payload)
                 delay(4_000L)
+            }
+        }
+        viewModelScope.launch {
+            var lastWeatherFetchMs = 0L
+            var weather = WeatherSnapshot()
+            while (isActive) {
+                val run = RunSession.state.value
+                val nowMs = System.currentTimeMillis()
+                val latitude = run.latitude
+                val longitude = run.longitude
+                if (latitude != null && longitude != null && nowMs - lastWeatherFetchMs >= 10 * 60 * 1_000L) {
+                    weather = weatherProvider.fetch(latitude, longitude, nowMs)
+                    lastWeatherFetchMs = nowMs
+                } else {
+                    weather = weatherProvider.snapshot(nowMs)
+                }
+                val clock = LocalTime.now().format(DateTimeFormatter.ofPattern("h:mm a", Locale.US))
+                bleClient.publishDisplayContext(
+                    DisplayContextPacket(
+                        clock = clock,
+                        weatherState = weather.state.wireValue,
+                        temperatureAvailable = weather.temperatureF != null,
+                        temperatureF = weather.temperatureF ?: 0,
+                    ),
+                )
+                delay(30_000L)
             }
         }
     }

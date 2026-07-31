@@ -56,6 +56,11 @@ class Dashboard {
   lv_obj_t* mediaArtist_ = nullptr;
   lv_obj_t* mediaPlayButton_ = nullptr;
   lv_obj_t* musicFooter_ = nullptr;
+  lv_obj_t* clock_ = nullptr;
+  lv_obj_t* weather_ = nullptr;
+  lv_obj_t* battery_ = nullptr;
+  lv_obj_t* statsClock_ = nullptr;
+  lv_obj_t* statsTemperature_ = nullptr;
 };
 
 }  // namespace rundeck

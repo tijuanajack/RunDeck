@@ -140,6 +140,15 @@ Last verified: 2026-07-30.
 - Notification end-to-end verification: the user confirmed a new test message
   appeared on RunDeck after selecting the message source. The phone listener,
   allowlist, BLE notification write, and device overlay are working together.
+- Environment context checkpoint: Android now formats local time and fetches
+  current Fahrenheit temperature from Open-Meteo using the active GPS fix,
+  caching it with a ten-minute refresh limit and explicit stale/unavailable
+  states. A bounded `0006` CBOR context packet carries clock/weather to the
+  display every 30 seconds. Firmware renders live time/temperature only while
+  context is fresh and reads the Waveshare GPIO17 battery ADC with GPIO16
+  battery enable; invalid ADC values render `BAT --`. Firmware compiled and
+  flashed successfully on 2026-07-31; Android build passed, but APK install
+  remains pending until the Samsung is visible to ADB.
 - The selected V1 Long Run target is 8:50–9:20 /mi. Android derives
   `ON TARGET`, `EASE OFF`, `PICK IT UP`, or `GPS WEAK` and sends that state to
   the display. Active-run distance, elapsed time, and pace are checkpointed
@@ -164,7 +173,8 @@ Last verified: 2026-07-30.
   off/unavailable until an actual HR source is connected. Garmin HRM-Dual
   direct mode, concurrent central/peripheral soak testing, and phone-forwarded
   HR remain future work.
-- Full notification allowlisting/dismissal, Open-Meteo, touch lock,
+- Full notification allowlisting/dismissal, weather location before a run,
+  touch lock,
   brightness/power work, and real-run outdoor validation remain future work.
 - The scripted flash helper deliberately refuses to choose between multiple
   serial ports. When the phone is also attached, identify the Espressif USB

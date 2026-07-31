@@ -76,6 +76,16 @@ class RunDeckProtocolTest {
         assert(payload.size <= RunDeckProtocol.MAX_NOTIFICATION_BYTES)
     }
 
+    @Test fun `display context encodes clock and stale-safe weather fields`() {
+        val payload = RunDeckProtocol.encodeDisplayContext(
+            47,
+            DisplayContextPacket("10:42 AM", weatherState = 0, temperatureAvailable = true, temperatureF = 78),
+        )
+
+        assertEquals(0xA6, payload[0].toInt() and 0xFF)
+        assert(payload.size <= RunDeckProtocol.MAX_DISPLAY_CONTEXT_BYTES)
+    }
+
     @Test fun `device ack event decodes command and sequence`() {
         val event = RunDeckProtocol.decodeDeviceEvent(byteArrayOf(
             1,

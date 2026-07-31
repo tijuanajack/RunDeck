@@ -59,6 +59,22 @@ unknown-key, or replayed packets.
 | `5` | `title` | text | Max 40 bytes. |
 | `6` | `artist` | text | Max 32 bytes. |
 
+The first `0006` context packet is a six-entry CBOR map carrying the
+phone-owned clock and Open-Meteo temperature. It is sent on connect and every
+30 seconds; weather refreshes are limited to once per 10 minutes. Weather state
+uses `0=connected`, `1=stale`, `2=unavailable`, `3=error`. The ESP32 rejects
+old or malformed context packets and shows `TEMP STALE`/`TEMP --` instead of
+presenting an old reading as live.
+
+| Key | Field | Type | Notes |
+| --- | --- | --- | --- |
+| `0` | `version` | uint | Must be `1`. |
+| `1` | `sequence` | uint | `0..65535`, monotonic context stream. |
+| `2` | `clock` | text | Printable `h:mm AM/PM`, max 8 bytes. |
+| `3` | `weatherState` | uint | `0..3`, as defined above. |
+| `4` | `temperatureAvailable` | bool | False when weather is unavailable. |
+| `5` | `temperatureOffset` | uint | Fahrenheit plus 100, bounded by firmware. |
+
 Low-frequency CBOR payloads have a 768-byte total limit. Notification text is
 sanitized by Android, truncated to 240 UTF-8 bytes, and fragmented with
 `messageId`, `fragmentIndex`, and `fragmentCount`; firmware permits at most
