@@ -237,7 +237,7 @@ Last verified: 2026-07-30.
   safe packet gating are now in place. Physical strap pairing and a real HR
   run are the next verification gate.
 - Fragmented long notifications,
-  weather location before a run, touch lock, brightness/power work, and
+  weather location before a run, brightness/power work, and
   real-run outdoor validation remain future work. App-level message-source
   selection and 90-second duplicate suppression are implemented.
 - The scripted flash helper deliberately refuses to choose between multiple
@@ -253,8 +253,9 @@ Last verified: 2026-07-30.
    pause/resume/stop, then polish tap-size/debounce issues found.
 3. On the Samsung, review the new BACKGROUND RUNS card and approve the
    battery-optimization exemption before a screen-lock run test. Then add
-   permitted contact-level filtering, followed by touch lock/brightness and
-   outdoor/power validation.
+   permitted contact-level filtering, followed by brightness/power and
+   outdoor validation. The device touch lock is now available from the
+   swipe-up Run Controls panel; it unlocks only with an up-then-down gesture.
 4. Add optional HR: phone-forwarded HR and target/combined pace-HR status
    rules first, then evaluate direct Garmin HRM-Dual only behind the
    BLE-concurrency soak gate. The strap must be treated as absent when not

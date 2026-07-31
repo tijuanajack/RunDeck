@@ -25,10 +25,12 @@ class Dashboard {
   static void onMediaNext(lv_event_t* event);
   static void onRunPause(lv_event_t* event);
   static void onRunStop(lv_event_t* event);
+  static void onTouchLock(lv_event_t* event);
 
   void emitMediaControl(MediaControlAction action);
   void emitRunControl(RunControlAction action);
   void emitNotificationDismiss(uint16_t sequence);
+  void setTouchLocked(bool locked);
 
   void show(Screen page);
   void buildDashboard();
@@ -75,6 +77,9 @@ class Dashboard {
   lv_obj_t* statsValues_[8] = {};
   lv_obj_t* runControls_ = nullptr;
   lv_obj_t* runPauseButton_ = nullptr;
+  lv_obj_t* touchLockOverlay_ = nullptr;
+  bool touchLocked_ = false;
+  bool unlockArmed_ = false;
   void (*runControlHandler_)(RunControlAction, void*) = nullptr;
   void* runControlContext_ = nullptr;
   void (*notificationDismissHandler_)(uint16_t, void*) = nullptr;
