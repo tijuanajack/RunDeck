@@ -33,6 +33,7 @@ class Dashboard {
   void setTouchLocked(bool locked);
 
   void show(Screen page);
+  void buildSplash();
   void buildDashboard();
   void buildMusic();
   void buildStats();
@@ -50,6 +51,7 @@ class Dashboard {
   lv_obj_t* notificationBody_ = nullptr;
   Screen page_ = Screen::Dashboard;
   DisplayState state_{};
+  bool splashVisible_ = true;
   bool notificationDismissed_ = false;
   bool runControlsVisible_ = false;
   void (*mediaControlHandler_)(MediaControlAction, void*) = nullptr;

@@ -1,6 +1,8 @@
 package com.rundeck.app.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,9 +17,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.painterResource
+import com.rundeck.app.R
 import com.rundeck.app.ble.DeviceConnection
 import com.rundeck.app.ble.DiscoveredRunDeck
 
@@ -59,8 +64,16 @@ fun DeviceRow(device: DiscoveredRunDeck, onClick: () -> Unit) = Row(
 }
 
 @Composable
-fun BrandHeader(title: String) {
-    Text("RUNDECK", color = Lime, fontSize = 28.sp, fontWeight = FontWeight.Black, letterSpacing = 4.sp)
+fun BrandHeader(title: String) = Column(
+    Modifier.fillMaxWidth(),
+    horizontalAlignment = Alignment.CenterHorizontally,
+) {
+    Image(
+        painter = painterResource(R.drawable.rundeck_header),
+        contentDescription = "RunDeck by Bowline Method",
+        modifier = Modifier.fillMaxWidth().height(112.dp),
+        contentScale = ContentScale.Fit,
+    )
     Text(title, color = White, fontSize = 34.sp, fontWeight = FontWeight.Bold)
 }
 

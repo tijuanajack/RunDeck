@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "brand_splash.h"
+
 namespace rundeck {
 namespace {
 const lv_color_t kWhite = lv_color_hex(0xF6F7F8);
@@ -79,7 +81,8 @@ void Dashboard::begin() {
   lv_obj_set_size(content_, 600, 450);
   lv_obj_clear_flag(content_, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_add_flag(content_, LV_OBJ_FLAG_GESTURE_BUBBLE);
-  show(Screen::Dashboard);
+  splashVisible_ = true;
+  buildSplash();
 }
 
 void Dashboard::onGesture(lv_event_t* event) {
@@ -197,6 +200,7 @@ void Dashboard::setTouchLocked(bool locked) {
 }
 
 void Dashboard::show(Screen page) {
+  splashVisible_ = false;
   page_ = page;
   pace_ = paceTarget_ = distance_ = elapsed_ = hr_ = hrTarget_ = media_ = nullptr;
   mediaSource_ = mediaTrack_ = mediaArtist_ = mediaPlayButton_ = musicFooter_ = nullptr;
@@ -217,6 +221,16 @@ void Dashboard::show(Screen page) {
   if (!notification_) buildNotification();
   buildRunControls();
   updateDashboard();
+}
+
+void Dashboard::buildSplash() {
+  lv_obj_clean(content_);
+  lv_obj_t* image = lv_img_create(content_);
+  lv_img_set_src(image, &kBrandSplash);
+  // The compact flash-resident artwork is rendered at 2x on the native
+  // 600x450 panel, leaving a clean black margin around the supplied mark.
+  lv_img_set_zoom(image, 512);
+  lv_obj_center(image);
 }
 
 void Dashboard::buildDashboard() {
@@ -537,6 +551,14 @@ void Dashboard::updateDashboard() {
 
 void Dashboard::render(const DisplayState& state) {
   state_ = state;
+  if (splashVisible_) {
+    if (state_.phone.state == SourceState::Connected) {
+      splashVisible_ = false;
+      show(Screen::Dashboard);
+    } else {
+      return;
+    }
+  }
   updateDashboard();
 }
 

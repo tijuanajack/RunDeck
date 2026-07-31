@@ -12,6 +12,7 @@
 // modular on disk, then include it once at the composition root.
 #include "app/simulated_data.cpp"
 #include "ble/rundeck_ble.cpp"
+#include "ui/brand_splash.cpp"
 #include "ui/dashboard.cpp"
 #include "hr/direct_hr.cpp"
 #include "board/waveshare_board.cpp"

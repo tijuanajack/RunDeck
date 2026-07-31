@@ -142,6 +142,13 @@ Last verified: 2026-07-30.
   backoff. The phone shows a reconnecting state instead of requiring a fresh
   manual discovery after every short display/BLE restart. Android unit tests,
   debug build, install, and launch passed on 2026-07-31.
+- Branding checkpoint: the supplied RunDeck/Bowline artwork is now included
+  as the Android setup/run header and the icon-only lower-right mark is the
+  Android launcher icon. The same branded artwork is reduced to a flash-safe
+  RGB565 LVGL splash; RunDeck holds it on boot until the first fresh phone
+  metrics frame, then transitions to the normal dashboard. Android build,
+  install, launch, firmware compile, and hash-verified flash passed on
+  2026-07-31.
 - Notification end-to-end verification: the user confirmed a new test message
   appeared on RunDeck after selecting the message source. The phone listener,
   allowlist, BLE notification write, and device overlay are working together.

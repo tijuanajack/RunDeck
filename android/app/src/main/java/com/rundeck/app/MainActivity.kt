@@ -27,6 +27,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -540,7 +542,19 @@ private fun ResumeRunScreen(
     verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween,
 ) { Column { Text(device.name, color = White, fontWeight = FontWeight.Bold); Text("${device.address}  ${device.rssi} dBm", color = Muted, fontSize = 12.sp) }; Text("CONNECT", color = Lime, fontWeight = FontWeight.Bold) }
 
-@Composable private fun BrandHeader(title: String) { Text("RUNDECK", color = Lime, fontSize = 28.sp, fontWeight = FontWeight.Black, letterSpacing = 4.sp); Text(title, color = White, fontSize = 34.sp, fontWeight = FontWeight.Bold) }
+@Composable
+private fun BrandHeader(title: String) = Column(
+    Modifier.fillMaxWidth(),
+    horizontalAlignment = Alignment.CenterHorizontally,
+) {
+    androidx.compose.foundation.Image(
+        painter = painterResource(com.rundeck.app.R.drawable.rundeck_header),
+        contentDescription = "RunDeck by Bowline Method",
+        modifier = Modifier.fillMaxWidth().height(112.dp),
+        contentScale = ContentScale.Fit,
+    )
+    Text(title, color = White, fontSize = 34.sp, fontWeight = FontWeight.Bold)
+}
 @Composable private fun ScreenColumn(content: @Composable ColumnScope.() -> Unit) = Column(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 42.dp), content = content)
 @Composable private fun PrimaryButton(label: String, onClick: () -> Unit) = Button(onClick = onClick, colors = ButtonDefaults.buttonColors(containerColor = Lime, contentColor = Black), modifier = Modifier.fillMaxWidth().height(58.dp), shape = RoundedCornerShape(12.dp)) { Text(label, fontWeight = FontWeight.Black, fontSize = 17.sp) }
 
