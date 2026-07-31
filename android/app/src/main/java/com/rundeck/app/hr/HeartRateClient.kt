@@ -22,6 +22,20 @@ import java.util.UUID
 data class HeartRateDevice(val name: String, val address: String, internal val device: BluetoothDevice)
 data class HeartRateState(val connected: Boolean = false, val bpm: Int? = null, val status: String = "GARMIN STRAP OFF", val deviceName: String? = null)
 
+/** Decode a Bluetooth SIG Heart Rate Measurement packet (0x2A37). */
+internal fun decodeHeartRateMeasurement(value: ByteArray): Int? {
+    if (value.size < 2) return null
+    val flags = value[0].toInt() and 0xFF
+    val bpm = if ((flags and 0x01) == 0) {
+        value[1].toInt() and 0xFF
+    } else if (value.size >= 3) {
+        (value[1].toInt() and 0xFF) or ((value[2].toInt() and 0xFF) shl 8)
+    } else {
+        return null
+    }
+    return bpm.takeIf { it in 30..240 }
+}
+
 /** Standard Bluetooth Heart Rate Service client for phone-forwarded HR mode. */
 class HeartRateClient(context: Context) {
     private val appContext = context.applicationContext
@@ -53,6 +67,8 @@ class HeartRateClient(context: Context) {
     private val scanCallback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
             val device = result.device
+            val advertisesHeartRate = result.scanRecord?.serviceUuids?.any { it.uuid == HEART_RATE_SERVICE } == true
+            if (!advertisesHeartRate) return
             val name = device.name ?: return
             if (name.isBlank()) return
             seen[device.address] = HeartRateDevice(name, device.address, device)
@@ -142,12 +158,7 @@ class HeartRateClient(context: Context) {
     }
 
     private fun parseMeasurement(value: ByteArray) {
-        if (value.size < 2) return
-        val flags = value[0].toInt() and 0xFF
-        val bpm = if ((flags and 0x01) == 0) value[1].toInt() and 0xFF
-        else if (value.size >= 3) (value[1].toInt() and 0xFF) or ((value[2].toInt() and 0xFF) shl 8)
-        else return
-        if (bpm !in 30..240) return
+        val bpm = decodeHeartRateMeasurement(value) ?: return
         lastMeasurementAtMs = System.currentTimeMillis()
         _state.value = _state.value.copy(connected = true, bpm = bpm, status = "HR LIVE")
     }
