@@ -508,7 +508,7 @@ class NotificationCallbacks : public NimBLECharacteristicCallbacks {
     const std::string value = characteristic->getValue();
     if (value.size() < kNotificationFragmentHeaderBytes || value.size() > kNotificationFragmentMaxBytes) return;
     const auto* input = reinterpret_cast<const uint8_t*>(value.data());
-    if (input[0] != kProtocolVersion || input[1] != kNotificationFragmentType || u16(input + 8) != 0) return;
+    if (input[0] != kProtocolVersion || input[1] != kNotificationFragmentType || input[8] != 0) return;
     const uint16_t sequence = u16(input + 2);
     const uint8_t index = input[4];
     const uint8_t count = input[5];
