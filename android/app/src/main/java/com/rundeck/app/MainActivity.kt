@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -235,7 +237,12 @@ private fun DeviceSetupScreen(
     onNotificationForwarding: (Boolean) -> Unit,
     onNotificationAllowAll: (Boolean) -> Unit,
     onNotificationSourceAllowed: (String, Boolean) -> Unit,
-) = ScreenColumn {
+) = Column(
+    Modifier
+        .fillMaxSize()
+        .verticalScroll(rememberScrollState())
+        .padding(horizontal = 24.dp, vertical = 42.dp),
+) {
     BrandHeader("DEVICE SETUP")
     Spacer(Modifier.height(14.dp))
     StatusCard(connection)

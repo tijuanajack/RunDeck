@@ -129,9 +129,14 @@ Last verified: 2026-07-30.
   allowlist card on Device Setup with forwarding on/off, all-message-apps mode,
   selected-sources mode, source discovery for common installed message apps and
   observed notification packages, and local persistence. Android tests/build
-  passed on 2026-07-31, but APK install/launch is pending because ADB did not
-  see the phone at handoff. Contact-level allowlisting, Android-side dismissal
-  acknowledgements, and fragmented long notifications remain future work.
+  passed on 2026-07-31; the updated APK was installed and launched on the
+  attached Samsung after reconnecting ADB. Contact-level allowlisting,
+  Android-side dismissal acknowledgements, and fragmented long notifications
+  remain future work.
+- Device Setup usability checkpoint: the setup screen now scrolls on the
+  phone, so the Messages card's ALL APPS / SELECTED controls and source rows
+  are reachable on a full-height device. Android tests/build and install/launch
+  passed on 2026-07-31.
 - The selected V1 Long Run target is 8:50–9:20 /mi. Android derives
   `ON TARGET`, `EASE OFF`, `PICK IT UP`, or `GPS WEAK` and sends that state to
   the display. Active-run distance, elapsed time, and pace are checkpointed
