@@ -197,7 +197,9 @@ bool beginWaveshareBoard() {
 bool setDisplayBrightness(uint8_t level) {
   if (!panelIo) return false;
   const uint8_t value = level;
-  return esp_lcd_panel_io_tx_param(panelIo, 0x51, &value, 1) == ESP_OK;
+  const bool ok = esp_lcd_panel_io_tx_param(panelIo, 0x51, &value, 1) == ESP_OK;
+  Serial.printf("RunDeck brightness %u (%s)\n", level, ok ? "sent" : "failed");
+  return ok;
 }
 
 }  // namespace rundeck

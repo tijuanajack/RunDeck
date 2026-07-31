@@ -632,7 +632,10 @@ class SettingsCallbacks : public NimBLECharacteristicCallbacks {
         accepted = true;
       }
       portEXIT_CRITICAL(&metricsMux);
-      if (accepted) setDisplayBrightness(brightness);
+      if (accepted) {
+        Serial.printf("RunDeck settings brightness=%u\n", brightness);
+        setDisplayBrightness(brightness);
+      }
       if (accepted) notifyAck(sequence, kCommandSettings, kAckOk);
       return;
     }

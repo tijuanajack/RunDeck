@@ -187,7 +187,7 @@ private fun RunDeckApp(viewModel: DeviceViewModel = viewModel()) {
                     onBack = { showRunSetup = false },
                 )
                 else -> com.rundeck.app.device.DeviceSetupScreen(
-                    connection, devices, media, notifications, requestBluetooth,
+                    connection, bridge, devices, media, notifications, requestBluetooth,
                     onConnect = viewModel::connect,
                     onContinue = { showRunSetup = true },
                     onEnableMedia = {

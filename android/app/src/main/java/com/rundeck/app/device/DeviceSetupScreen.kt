@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.rundeck.app.ble.DeviceConnection
 import com.rundeck.app.ble.DiscoveredRunDeck
+import com.rundeck.app.ble.LiveBridgeStatus
 import com.rundeck.app.media.PhoneMediaState
 import com.rundeck.app.notifications.RunDeckNotificationSettings
 import com.rundeck.app.run.HrOwnershipMode
@@ -46,6 +47,7 @@ import com.rundeck.app.ui.White
 @Composable
 fun DeviceSetupScreen(
     connection: DeviceConnection,
+    bridge: LiveBridgeStatus,
     devices: List<DiscoveredRunDeck>,
     media: PhoneMediaState,
     notifications: RunDeckNotificationSettings,
@@ -96,7 +98,7 @@ fun DeviceSetupScreen(
     Spacer(Modifier.height(14.dp))
     WeatherLocationCard(weatherLocationStatus, onUseWeatherLocation)
     Spacer(Modifier.height(14.dp))
-    BrightnessCard(displayBrightness, onDisplayBrightness)
+    BrightnessCard(displayBrightness, bridge, onDisplayBrightness)
     Spacer(Modifier.height(14.dp))
     HrModeCard(hrOwnership, onHrOwnershipMode)
     Spacer(Modifier.height(14.dp))
@@ -122,12 +124,21 @@ private fun WeatherLocationCard(status: String, onUseLocation: () -> Unit) = Col
 }
 
 @Composable
-private fun BrightnessCard(level: Int, onBrightness: (Int) -> Unit) = Column(
+private fun BrightnessCard(level: Int, bridge: LiveBridgeStatus, onBrightness: (Int) -> Unit) = Column(
     Modifier.fillMaxWidth().background(Color(0xFF080A0D), RoundedCornerShape(16.dp)).padding(18.dp),
 ) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
         androidx.compose.material3.Text("DISPLAY BRIGHTNESS", color = Cyan, fontSize = 13.sp, letterSpacing = 2.sp)
-        androidx.compose.material3.Text("${(level * 100 / 255)}%", color = Lime, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+        androidx.compose.material3.Text(
+            when {
+                bridge.lastSettingsAckMs > 0 -> "SETTINGS ACCEPTED"
+                bridge.connected -> "CONNECTED"
+                else -> "OFFLINE"
+            },
+            color = if (bridge.lastSettingsAckMs > 0) Lime else Muted,
+            fontWeight = FontWeight.Bold,
+            fontSize = 12.sp,
+        )
     }
     Spacer(Modifier.height(8.dp))
     androidx.compose.material3.Text("Adjust AMOLED brightness without changing boot, wake, or touch-lock behavior.", color = Muted, fontSize = 13.sp)
@@ -141,6 +152,8 @@ private fun BrightnessCard(level: Int, onBrightness: (Int) -> Unit) = Column(
             ) { androidx.compose.material3.Text(label, fontWeight = FontWeight.Black, fontSize = 10.sp) }
         }
     }
+    Spacer(Modifier.height(8.dp))
+    androidx.compose.material3.Text("Current level: ${(level * 100 / 255)}%", color = White, fontSize = 12.sp)
 }
 
 @Composable
