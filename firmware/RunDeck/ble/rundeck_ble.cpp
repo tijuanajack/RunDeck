@@ -17,6 +17,7 @@ constexpr char kHeartbeatUuid[] = "7b2e0007-6d1f-4a91-8a5f-6c796a25a000";
 constexpr uint8_t kProtocolVersion = 1;
 constexpr uint8_t kLiveMetricsType = 1;
 constexpr uint8_t kDeviceEventAckType = 0x51;
+constexpr uint8_t kDeviceEventMediaControlType = 0x52;
 constexpr uint8_t kCommandRunState = 2;
 constexpr uint8_t kAckOk = 0;
 constexpr size_t kHeaderBytes = 12;
@@ -76,6 +77,7 @@ uint32_t mediaReceivedAtMs = 0;
 bool haveMedia = false;
 bool haveMediaSequence = false;
 NimBLECharacteristic* deviceEventCharacteristic = nullptr;
+uint16_t deviceEventSequence = 0;
 
 uint16_t u16(const uint8_t* input) { return static_cast<uint16_t>(input[0] | (input[1] << 8)); }
 uint32_t u32(const uint8_t* input) {
@@ -254,6 +256,23 @@ void notifyAck(uint16_t sequence, uint8_t commandType, uint8_t status) {
   deviceEventCharacteristic->setValue(payload, sizeof(payload));
 }
 
+void notifyDeviceMediaControl(MediaControlAction action) {
+  if (!deviceEventCharacteristic) return;
+  const uint16_t sequence = ++deviceEventSequence;
+  const uint8_t payload[] = {
+      kProtocolVersion,
+      kDeviceEventMediaControlType,
+      static_cast<uint8_t>(sequence & 0xFF),
+      static_cast<uint8_t>(sequence >> 8),
+      static_cast<uint8_t>(action),
+      0,
+      0,
+      0,
+  };
+  deviceEventCharacteristic->setValue(payload, sizeof(payload));
+  deviceEventCharacteristic->notify();
+}
+
 class LiveMetricsCallbacks : public NimBLECharacteristicCallbacks {
   void onWrite(NimBLECharacteristic* characteristic, NimBLEConnInfo&) override {
     const std::string value = characteristic->getValue();
@@ -422,6 +441,10 @@ void RunDeckBle::applyMediaState(DisplayState* state, uint32_t nowMs) {
   state->mediaSource = fresh ? source : "PHONE";
   state->mediaTitle = fresh ? (available ? title : "NO MEDIA") : "MEDIA STALE";
   state->mediaArtist = fresh ? artist : "";
+}
+
+void RunDeckBle::notifyMediaControl(MediaControlAction action) {
+  notifyDeviceMediaControl(action);
 }
 
 bool RunDeckBle::applyLiveMetrics(DisplayState* state, uint32_t nowMs) {

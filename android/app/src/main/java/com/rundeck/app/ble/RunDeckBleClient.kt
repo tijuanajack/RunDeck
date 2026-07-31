@@ -5,6 +5,7 @@ import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCallback
 import android.bluetooth.BluetoothGattCharacteristic
+import android.bluetooth.BluetoothGattDescriptor
 import android.bluetooth.BluetoothGattService
 import android.bluetooth.BluetoothManager
 import android.bluetooth.le.BluetoothLeScanner
@@ -20,7 +21,10 @@ import com.rundeck.app.media.PhoneMediaState
 import com.rundeck.app.run.RunUiState
 import com.rundeck.app.run.LongRunTarget
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.roundToInt
@@ -66,7 +70,10 @@ private sealed class GattOperation(val label: String) {
         val name: String,
     ) : GattOperation(name)
     data class Read(val characteristic: BluetoothGattCharacteristic, val name: String) : GattOperation(name)
+    data class DescriptorWrite(val descriptor: BluetoothGattDescriptor, val payload: ByteArray, val name: String) : GattOperation(name)
 }
+
+enum class DeviceMediaControl { Previous, PlayPause, Next }
 
 class RunDeckBleClient(context: Context) {
     private val appContext = context.applicationContext
@@ -97,6 +104,8 @@ class RunDeckBleClient(context: Context) {
     val connection: StateFlow<DeviceConnection> = _connection.asStateFlow()
     private val _bridge = MutableStateFlow(LiveBridgeStatus())
     val bridge: StateFlow<LiveBridgeStatus> = _bridge.asStateFlow()
+    private val _deviceMediaControls = MutableSharedFlow<DeviceMediaControl>(extraBufferCapacity = 8)
+    val deviceMediaControls: SharedFlow<DeviceMediaControl> = _deviceMediaControls.asSharedFlow()
 
     private val reconnectRunnable = Runnable { reconnectRememberedDevice() }
 
@@ -144,6 +153,7 @@ class RunDeckBleClient(context: Context) {
             deviceEvents = service?.getCharacteristic(RunDeckProtocol.DEVICE_EVENT_UUID)
             _connection.value = if (status == BluetoothGatt.GATT_SUCCESS && liveMetrics != null && runState != null && mediaMetadata != null && deviceEvents != null) {
                 _bridge.value = _bridge.value.copy(connected = true, lastError = null)
+                enableDeviceEventNotifications()
                 beginProtocolStream()
                 DeviceConnection.Ready(gatt.device.name ?: "RunDeck")
             } else {
@@ -176,6 +186,13 @@ class RunDeckBleClient(context: Context) {
                         _bridge.value.copy(lastError = "METRIC WRITE FAILED ($status)")
                     }
                 }
+            }
+            completeGattOperation()
+        }
+
+        override fun onDescriptorWrite(gatt: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {
+            if (descriptor.characteristic?.uuid == RunDeckProtocol.DEVICE_EVENT_UUID && status != BluetoothGatt.GATT_SUCCESS) {
+                _bridge.value = _bridge.value.copy(lastError = "EVENT SUBSCRIBE FAILED ($status)")
             }
             completeGattOperation()
         }
@@ -364,6 +381,11 @@ class RunDeckBleClient(context: Context) {
         drainGattQueue()
     }
 
+    private fun queueDescriptorWrite(descriptor: BluetoothGattDescriptor, payload: ByteArray, label: String) {
+        pendingGattOps.addLast(GattOperation.DescriptorWrite(descriptor, payload, label))
+        drainGattQueue()
+    }
+
     @SuppressLint("MissingPermission")
     private fun drainGattQueue() {
         if (gattOperationInFlight) return
@@ -382,6 +404,15 @@ class RunDeckBleClient(context: Context) {
                 }
             }
             is GattOperation.Read -> target.readCharacteristic(operation.characteristic)
+            is GattOperation.DescriptorWrite -> {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    target.writeDescriptor(operation.descriptor, operation.payload) == BluetoothGatt.GATT_SUCCESS
+                } else {
+                    operation.descriptor.value = operation.payload
+                    @Suppress("DEPRECATION")
+                    target.writeDescriptor(operation.descriptor)
+                }
+            }
         }
         if (!queued) {
             gattOperationInFlight = false
@@ -418,6 +449,15 @@ class RunDeckBleClient(context: Context) {
     }
 
     @SuppressLint("MissingPermission")
+    private fun enableDeviceEventNotifications() {
+        val target = gatt ?: return
+        val events = deviceEvents ?: return
+        target.setCharacteristicNotification(events, true)
+        val descriptor = events.getDescriptor(CCCD_UUID) ?: return
+        queueDescriptorWrite(descriptor, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE, OP_EVENT_SUBSCRIBE)
+    }
+
+    @SuppressLint("MissingPermission")
     private fun queueDeviceEventAck() {
         val events = deviceEvents ?: return
         queueRead(events, OP_ACK_READ)
@@ -440,6 +480,18 @@ class RunDeckBleClient(context: Context) {
                         _bridge.value.copy(lastError = "RUN STATE REJECTED (${event.status.toInt() and 0xFF})")
                     }
                     startMetricsStream()
+                }
+                if (event is DeviceEvent.MediaControl) {
+                    val control = when (event.action) {
+                        RunDeckProtocol.MEDIA_CONTROL_PREVIOUS -> DeviceMediaControl.Previous
+                        RunDeckProtocol.MEDIA_CONTROL_PLAY_PAUSE -> DeviceMediaControl.PlayPause
+                        RunDeckProtocol.MEDIA_CONTROL_NEXT -> DeviceMediaControl.Next
+                        else -> null
+                    }
+                    if (control != null) {
+                        _deviceMediaControls.tryEmit(control)
+                        _bridge.value = _bridge.value.copy(connected = true, lastMediaWriteConfirmedMs = SystemClock.elapsedRealtime(), lastError = null)
+                    }
                 }
             }
             .onFailure {
@@ -528,5 +580,7 @@ class RunDeckBleClient(context: Context) {
         const val OP_METRIC = "METRIC"
         const val OP_MEDIA = "MEDIA"
         const val OP_ACK_READ = "ACK READ"
+        const val OP_EVENT_SUBSCRIBE = "EVENT SUBSCRIBE"
+        val CCCD_UUID: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
     }
 }

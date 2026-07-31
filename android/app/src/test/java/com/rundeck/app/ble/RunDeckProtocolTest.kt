@@ -80,4 +80,19 @@ class RunDeckProtocolTest {
 
         assertEquals(DeviceEvent.Ack(42, RunDeckProtocol.COMMAND_RUN_STATE, RunDeckProtocol.ACK_OK), event)
     }
+
+    @Test fun `device media control event decodes action and sequence`() {
+        val event = RunDeckProtocol.decodeDeviceEvent(byteArrayOf(
+            1,
+            RunDeckProtocol.DEVICE_EVENT_MEDIA_CONTROL_TYPE,
+            0x2B,
+            0x00,
+            RunDeckProtocol.MEDIA_CONTROL_PLAY_PAUSE,
+            0,
+            0,
+            0,
+        ))
+
+        assertEquals(DeviceEvent.MediaControl(43, RunDeckProtocol.MEDIA_CONTROL_PLAY_PAUSE), event)
+    }
 }

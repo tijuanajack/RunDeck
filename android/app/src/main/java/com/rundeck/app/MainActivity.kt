@@ -46,6 +46,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rundeck.app.ble.DeviceConnection
+import com.rundeck.app.ble.DeviceMediaControl
 import com.rundeck.app.ble.DiscoveredRunDeck
 import com.rundeck.app.ble.LiveBridgeStatus
 import com.rundeck.app.ble.RunDeckBleClient
@@ -81,6 +82,15 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
         }
         viewModelScope.launch {
             media.collectLatest(bleClient::publishMediaState)
+        }
+        viewModelScope.launch {
+            bleClient.deviceMediaControls.collect { control ->
+                when (control) {
+                    DeviceMediaControl.Previous -> mediaController.previous()
+                    DeviceMediaControl.PlayPause -> mediaController.playPause()
+                    DeviceMediaControl.Next -> mediaController.next()
+                }
+            }
         }
     }
     fun scan() = bleClient.startScan()

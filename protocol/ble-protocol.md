@@ -64,15 +64,20 @@ sanitized by Android, truncated to 240 UTF-8 bytes, and fragmented with
 `messageId`, `fragmentIndex`, and `fragmentCount`; firmware permits at most
 four outstanding fragments and expires incomplete messages after 10 seconds.
 
-Important commands (run state, media command, dismissal, settings write) carry
-a command ID and produce one `0005` acknowledgement containing that ID and a
-success/error code. No notification content is persisted on the device.
+Important Android-to-device commands (run state, dismissal, settings write)
+carry a command ID and produce one `0005` acknowledgement containing that ID
+and a success/error code. No notification content is persisted on the device.
 
-`DeviceEvent` payload on `0005` starts with a compact fixed-width ACK event for
-the run-state/preset slice:
+`DeviceEvent` payloads on `0005` are compact fixed-width 8-byte events.
+
+ACK event:
 
 `version:u8, event_type:u8, acknowledged_sequence:u16, command_type:u8,
 status:u8, reserved:u16`
+
+Device-origin media-control event:
+
+`version:u8, event_type:u8, sequence:u16, action:u8, reserved:u8, reserved:u16`
 
 Current values:
 
@@ -80,10 +85,14 @@ Current values:
 | --- | --- | --- |
 | `version` | `1` | Protocol version. |
 | `event_type` | `0x51` | ACK event. |
+| `event_type` | `0x52` | Device-origin media-control event. |
 | `command_type` | `2` | Run-state/preset packet on `0002`. |
 | `status` | `0` | Accepted. |
+| `action` | `1` | Previous track. |
+| `action` | `2` | Play/pause toggle. |
+| `action` | `3` | Next track. |
 
-In the current Android prototype, Android reads `0005` after the run-state
-write completes. Firmware stores this ACK after accepting and storing a
-non-replayed run-state packet. The characteristic remains notify-capable for a
-later queued-GATT event stream, but V1 does not rely on CCCD subscription yet.
+In the current Android prototype, Android reads `0005` after a run-state write
+to retrieve the run-state ACK, and also subscribes to `0005` notifications for
+RunDeck Music-screen previous/play-pause/next taps. CCCD subscription and all
+reads/writes are serialized through the Android GATT operation queue.

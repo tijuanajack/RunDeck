@@ -23,6 +23,10 @@ rundeck::SimulatedData simulator;
 rundeck::Dashboard dashboard;
 rundeck::RunDeckBle ble;
 uint32_t lastRenderMs = 0;
+
+void onMediaControl(rundeck::MediaControlAction action, void*) {
+  ble.notifyMediaControl(action);
+}
 }
 
 void setup() {
@@ -37,6 +41,7 @@ void setup() {
     ESP.restart();
   }
   dashboard.begin();
+  dashboard.setMediaControlHandler(onMediaControl, nullptr);
   ble.begin();
 }
 

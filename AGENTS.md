@@ -125,17 +125,18 @@ planned work.
 - Media metadata is now Android-to-device over characteristic `0003` as a
   bounded ASCII CBOR packet sourced from active Android MediaSession
   controllers. The Android app has phone-side previous/play-pause/next buttons,
-  but RunDeck-device-origin media controls are still future work and should be
-  implemented before device-origin run controls per the user's latest order.
+  and RunDeck Music-screen PREV/PLAY-PAUSE/NEXT now send device-origin media
+  control events over characteristic `0005`; user confirmation is still needed.
   Keep display-bound media strings backed by persistent storage, not local
   decoded packet copies; the temporary-copy bug caused random characters under
   the song title.
 - Device-event `0005` currently exposes run-state ACK as an 8-byte compact
-  event. Android reads `0005` after the run-state write completes and shows
-  `PRESET ACCEPTED`. Android now serializes GATT writes/reads through an
-  explicit operation queue. A Samsung test exposed `prior command is not
-  finished` when notification subscription overlapped the protocol start, so
-  keep future notify subscription work on that queue.
+  event and device-origin media controls as 8-byte notify events. Android reads
+  `0005` after the run-state write completes and shows `PRESET ACCEPTED`;
+  Android also subscribes to `0005` notifications through the explicit GATT
+  operation queue. A Samsung test exposed `prior command is not finished` when
+  notification subscription overlapped the protocol start, so keep future GATT
+  work on that queue.
 - For the Long Run target, Android owns the 8:50–9:20 /mi rule. Do not hardcode
   a competing target on the display. Firmware currently renders the target and
   status flags sent by Android.

@@ -6,14 +6,22 @@
 
 namespace rundeck {
 
+enum class MediaControlAction : uint8_t { Previous = 1, PlayPause = 2, Next = 3 };
+
 class Dashboard {
  public:
   void begin();
   void render(const DisplayState& state);
+  void setMediaControlHandler(void (*handler)(MediaControlAction, void*), void* context);
 
  private:
   static void onGesture(lv_event_t* event);
   static void onStart(lv_event_t* event);
+  static void onMediaPrevious(lv_event_t* event);
+  static void onMediaPlayPause(lv_event_t* event);
+  static void onMediaNext(lv_event_t* event);
+
+  void emitMediaControl(MediaControlAction action);
 
   void show(Screen page);
   void buildDashboard();
@@ -29,6 +37,8 @@ class Dashboard {
   Screen page_ = Screen::Dashboard;
   DisplayState state_{};
   bool notificationDismissed_ = false;
+  void (*mediaControlHandler_)(MediaControlAction, void*) = nullptr;
+  void* mediaControlContext_ = nullptr;
 
   lv_obj_t* pace_ = nullptr;
   lv_obj_t* paceTarget_ = nullptr;

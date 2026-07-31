@@ -102,6 +102,30 @@ void Dashboard::onStart(lv_event_t* event) {
   if (self) self->show(Screen::Dashboard);
 }
 
+void Dashboard::onMediaPrevious(lv_event_t* event) {
+  auto* self = static_cast<Dashboard*>(lv_event_get_user_data(event));
+  if (self) self->emitMediaControl(MediaControlAction::Previous);
+}
+
+void Dashboard::onMediaPlayPause(lv_event_t* event) {
+  auto* self = static_cast<Dashboard*>(lv_event_get_user_data(event));
+  if (self) self->emitMediaControl(MediaControlAction::PlayPause);
+}
+
+void Dashboard::onMediaNext(lv_event_t* event) {
+  auto* self = static_cast<Dashboard*>(lv_event_get_user_data(event));
+  if (self) self->emitMediaControl(MediaControlAction::Next);
+}
+
+void Dashboard::setMediaControlHandler(void (*handler)(MediaControlAction, void*), void* context) {
+  mediaControlHandler_ = handler;
+  mediaControlContext_ = context;
+}
+
+void Dashboard::emitMediaControl(MediaControlAction action) {
+  if (mediaControlHandler_) mediaControlHandler_(action, mediaControlContext_);
+}
+
 void Dashboard::show(Screen page) {
   page_ = page;
   pace_ = paceTarget_ = distance_ = elapsed_ = hr_ = hrTarget_ = media_ = nullptr;
@@ -173,6 +197,9 @@ void Dashboard::buildMusic() {
   const char* controls[] = {"PREV", "PAUSE", "NEXT"};
   for (int i = 0; i < 3; ++i) {
     lv_obj_t* control = panel(content_, 24 + i * 194, 258, 170, 78, kCyan);
+    lv_obj_add_flag(control, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(control, i == 0 ? onMediaPrevious : (i == 1 ? onMediaPlayPause : onMediaNext),
+                        LV_EVENT_CLICKED, this);
     lv_obj_t* controlText = label(control, &lv_font_montserrat_20, LV_ALIGN_CENTER, 0, 0);
     lv_label_set_text(controlText, controls[i]);
     if (i == 1) mediaPlayButton_ = controlText;
