@@ -160,6 +160,10 @@ Last verified: 2026-07-30.
   selected rules; LONG RUN remains the default. Android tests/build and APK
   install/launch passed on 2026-07-31; firmware compile/flash passed with
   dynamic HR target rendering.
+- Preset crash fix: the EASY target label exceeded the protocol's bounded
+  28-character field and could throw while selecting it. Labels now stay
+  within the wire limit, with a regression test covering every catalog preset;
+  the corrected APK was installed and launched on 2026-07-31.
 - Notification end-to-end verification: the user confirmed a new test message
   appeared on RunDeck after selecting the message source. The phone listener,
   allowlist, BLE notification write, and device overlay are working together.
