@@ -162,6 +162,11 @@ Last verified: 2026-07-30.
   HR remains the compatibility default; PhoneOnly and DirectDeviceHr send no
   HR value until a matching source is actually available. The display still
   renders unavailable HR as `--` / `GARMIN STRAP OFF`.
+- Combined target-status checkpoint: Android now marks forwarded HR as
+  `HR LOW`, `HR HIGH`, or `IN ZONE`; high HR dominates pace with `BACK OFF`,
+  while high HR plus fast pace yields `EASE OFF`. The corresponding live-metric
+  flags and Stats/dashboard labels are implemented and the firmware flashed
+  with a verified hash on 2026-07-31.
 - Environment context checkpoint: Android now formats local time and fetches
   current Fahrenheit temperature from Open-Meteo using the active GPS fix,
   caching it with a ten-minute refresh limit and explicit stale/unavailable

@@ -724,6 +724,7 @@ bool RunDeckBle::applyLiveMetrics(DisplayState* state, uint32_t nowMs) {
   if (!valid || nowMs - receivedAt > kMetricsFreshForMs) return false;
 
   state->phone = {SourceState::Connected, receivedAt};
+  state->metricFlags = metrics.flags;
   state->gps = {SourceState::Connected, receivedAt};
   state->heartRate = {metrics.heartRateBpm ? SourceState::Connected : SourceState::Unavailable, receivedAt};
   state->paceMinutesPerMile = metrics.paceSecondsPerMile / 60.0f;
@@ -733,7 +734,8 @@ bool RunDeckBle::applyLiveMetrics(DisplayState* state, uint32_t nowMs) {
   state->runPaused = (metrics.flags & 0x0020) != 0;
   state->temperatureF = static_cast<int8_t>(metrics.temperatureDeciF / 10);
   applyRunState(state, nowMs);
-  if (metrics.flags & 0x0004) state->statusText = "ON TARGET";
+  if (metrics.flags & 0x0080) state->statusText = (metrics.flags & 0x0008) ? "EASE OFF" : "BACK OFF";
+  else if (metrics.flags & 0x0004) state->statusText = "ON TARGET";
   else if (metrics.flags & 0x0008) state->statusText = "EASE OFF";
   else if (metrics.flags & 0x0010) state->statusText = "PICK IT UP";
   else state->statusText = "GPS WEAK";

@@ -397,7 +397,7 @@ void Dashboard::updateDashboard() {
     if (state_.heartRateBpm > 0) snprintf(stats, sizeof(stats), "%u", state_.heartRateBpm);
     else snprintf(stats, sizeof(stats), "--");
     lv_label_set_text(statsValues_[3], stats);
-    lv_label_set_text(statsValues_[4], state_.heartRateBpm > 0 ? "IN ZONE" : "--");
+    lv_label_set_text(statsValues_[4], state_.heartRateBpm > 0 ? ((state_.metricFlags & 0x0080) ? "HR HIGH" : ((state_.metricFlags & 0x0040) ? "HR LOW" : "IN ZONE")) : "--");
     snprintf(stats, sizeof(stats), "%.2f", miles); lv_label_set_text(statsValues_[5], stats);
     snprintf(stats, sizeof(stats), "%02lu:%02lu", state_.elapsedSeconds / 60, state_.elapsedSeconds % 60);
     lv_label_set_text(statsValues_[6], stats);
@@ -483,7 +483,7 @@ void Dashboard::updateDashboard() {
   const bool heartRateLive = state_.heartRate.state == SourceState::Connected && state_.heartRateBpm > 0;
   if (heartRateLive) {
     snprintf(value, sizeof(value), "%u", state_.heartRateBpm); lv_label_set_text(hr_, value);
-    lv_label_set_text(hrTarget_, "TARGET 135-150 / IN ZONE");
+    lv_label_set_text(hrTarget_, (state_.metricFlags & 0x0080) ? "TARGET 135-150 / HR HIGH" : ((state_.metricFlags & 0x0040) ? "TARGET 135-150 / HR LOW" : "TARGET 135-150 / IN ZONE"));
   } else {
     lv_label_set_text(hr_, "--");
     lv_label_set_text(hrTarget_, "GARMIN STRAP OFF");

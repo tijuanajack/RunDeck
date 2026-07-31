@@ -385,7 +385,9 @@ class RunDeckBleClient(context: Context) {
             sequence.getAndIncrement() and 0xFFFF,
             SystemClock.elapsedRealtime() and 0xFFFF_FFFFL,
             LiveMetrics(
-                flags = 0x0003 or LongRunTarget.status(state.paceSecondsPerMile).packetFlag or if (state.paused) 0x0020 else 0,
+                flags = 0x0003 or LongRunTarget.status(state.paceSecondsPerMile).packetFlag or
+                    LongRunTarget.heartRateStatus(if (hrOwnershipMode == HrOwnershipMode.PhoneForwardedHr) state.heartRateBpm else null).packetFlag or
+                    if (state.paused) 0x0020 else 0,
                 paceSecondsPerMile = pace,
                 distanceCentimeters = (state.distanceMeters * 100).roundToInt().toLong(),
                 elapsedSeconds = state.elapsedSeconds,

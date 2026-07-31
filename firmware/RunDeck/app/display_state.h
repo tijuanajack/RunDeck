@@ -42,6 +42,7 @@ struct DisplayState {
   const char* clockLabel;
   bool runActive;
   bool runPaused;
+  uint16_t metricFlags;
 };
 
 }  // namespace rundeck

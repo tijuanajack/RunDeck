@@ -464,8 +464,8 @@ private fun ActiveRunScreen(
         Metric("HR STRAP", state.heartRateBpm?.let { "$it BPM" } ?: "OFF")
     }
     Spacer(Modifier.height(20.dp))
-    val targetStatus = LongRunTarget.status(state.paceSecondsPerMile)
-    Text("TARGET ${LongRunTarget.label}  •  ${targetStatus.label}", color = when (targetStatus) { com.rundeck.app.run.PaceTargetStatus.OnTarget -> Lime; com.rundeck.app.run.PaceTargetStatus.GpsWeak -> Muted; else -> Amber }, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally))
+    val targetStatus = LongRunTarget.combinedStatus(state.paceSecondsPerMile, state.heartRateBpm)
+    Text("TARGET ${LongRunTarget.label}  •  ${targetStatus.label}", color = when (targetStatus) { is com.rundeck.app.run.CombinedTargetStatus.Pace -> when (targetStatus.status) { com.rundeck.app.run.PaceTargetStatus.OnTarget -> Lime; com.rundeck.app.run.PaceTargetStatus.GpsWeak -> Muted; else -> Amber }; com.rundeck.app.run.CombinedTargetStatus.GpsWeak -> Muted; else -> Color(0xFFFF5252) }, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally))
     Spacer(Modifier.weight(1f))
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Button(onClick = if (state.paused) onResume else onPause, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF14232A), contentColor = White), modifier = Modifier.weight(1f).height(56.dp)) {

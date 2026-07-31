@@ -143,6 +143,9 @@ planned work.
   `PhoneForwardedHr`, but transmit zero/unavailable unless that source has a
   real reading. `DirectDeviceHr` is a reserved mode behind the Garmin
   concurrent-role soak gate; never synthesize strap data.
+- Combined status uses live metric flags `0x0040=HR LOW` and `0x0080=HR HIGH`;
+  high HR dominates pace (`BACK OFF`, or `EASE OFF` when pace is also fast).
+  Keep the display labels non-medical and render unavailable HR as absent.
 - Media metadata is now Android-to-device over characteristic `0003` as a
   bounded ASCII CBOR packet sourced from active Android MediaSession
   controllers. The Android app has phone-side previous/play-pause/next buttons,
