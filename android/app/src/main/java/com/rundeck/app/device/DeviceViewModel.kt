@@ -18,6 +18,8 @@ import com.rundeck.app.run.RunSession
 import com.rundeck.app.run.RunTrackingService
 import com.rundeck.app.run.HrOwnershipMode
 import com.rundeck.app.run.HrOwnershipPreferences
+import com.rundeck.app.run.RunPreset
+import com.rundeck.app.run.RunPresetPreferences
 import com.rundeck.app.weather.OpenMeteoWeather
 import com.rundeck.app.weather.WeatherSnapshot
 import com.rundeck.app.hr.HeartRateClient
@@ -48,18 +50,23 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     val media = mediaController.state
     val notifications = RunDeckNotificationPreferences.settings
     val hrOwnership = HrOwnershipPreferences.mode
+    val selectedPreset = RunPresetPreferences.selected
     val heartRateDevices = heartRateClient.devices
     val heartRate = heartRateClient.state
 
     init {
         RunDeckNotificationPreferences.initialize(application)
         HrOwnershipPreferences.initialize(application)
+        RunPresetPreferences.initialize(application)
         mediaController.start()
         viewModelScope.launch {
             RunSession.state.collectLatest(bleClient::publishRunState)
         }
         viewModelScope.launch {
             hrOwnership.collectLatest(bleClient::setHrOwnershipMode)
+        }
+        viewModelScope.launch {
+            selectedPreset.collectLatest(bleClient::setPreset)
         }
         viewModelScope.launch {
             heartRate.collectLatest { source ->
@@ -150,6 +157,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     fun setNotificationContactAllowed(packageName: String, sender: String, allowed: Boolean) =
         RunDeckNotificationPreferences.setContactAllowed(getApplication(), packageName, sender, allowed)
     fun setHrOwnershipMode(mode: HrOwnershipMode) = HrOwnershipPreferences.set(getApplication(), mode)
+    fun setPreset(preset: RunPreset) = RunPresetPreferences.set(getApplication(), preset)
     fun scanHeartRate() = heartRateClient.scan()
     fun connectHeartRate(device: HeartRateDevice) = heartRateClient.connect(device)
 

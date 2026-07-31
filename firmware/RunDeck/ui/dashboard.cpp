@@ -66,6 +66,16 @@ Screen pageForIndex(int index) {
   static constexpr Screen kPages[] = {Screen::Ready, Screen::Dashboard, Screen::Music, Screen::Stats};
   return kPages[(index + 4) % 4];
 }
+
+void formatHeartRateTarget(const DisplayState& state, char* output, size_t capacity) {
+  if (state.heartRateHighBpm == 0) {
+    snprintf(output, capacity, "HR TARGET UNAVAILABLE");
+  } else if (state.heartRateLowBpm == 0) {
+    snprintf(output, capacity, "HR < %u", state.heartRateHighBpm);
+  } else {
+    snprintf(output, capacity, "HR %u-%u", state.heartRateLowBpm, state.heartRateHighBpm);
+  }
+}
 }  // namespace
 
 void Dashboard::begin() {
@@ -546,7 +556,12 @@ void Dashboard::updateDashboard() {
   const bool heartRateLive = state_.heartRate.state == SourceState::Connected && state_.heartRateBpm > 0;
   if (heartRateLive) {
     snprintf(value, sizeof(value), "%u", state_.heartRateBpm); lv_label_set_text(hr_, value);
-    lv_label_set_text(hrTarget_, (state_.metricFlags & 0x0080) ? "TARGET 135-150 / HR HIGH" : ((state_.metricFlags & 0x0040) ? "TARGET 135-150 / HR LOW" : "TARGET 135-150 / IN ZONE"));
+    char hrTarget[32];
+    char hrStatus[12];
+    formatHeartRateTarget(state_, hrTarget, sizeof(hrTarget));
+    snprintf(hrStatus, sizeof(hrStatus), "%s", (state_.metricFlags & 0x0080) ? "HR HIGH" : ((state_.metricFlags & 0x0040) ? "HR LOW" : "IN ZONE"));
+    snprintf(value, sizeof(value), "%s / %s", hrTarget, hrStatus);
+    lv_label_set_text(hrTarget_, value);
   } else {
     lv_label_set_text(hr_, "--");
     lv_label_set_text(hrTarget_, "GARMIN STRAP OFF");

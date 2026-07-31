@@ -587,6 +587,8 @@ void RunDeckBle::applyRunState(DisplayState* state, uint32_t nowMs) {
   if (valid) {
     state->presetName = latestRunState.presetName;
     state->targetLabel = latestRunState.targetLabel;
+    state->heartRateLowBpm = latestRunState.hrLowBpm;
+    state->heartRateHighBpm = latestRunState.hrHighBpm;
   }
   portEXIT_CRITICAL(&metricsMux);
 }

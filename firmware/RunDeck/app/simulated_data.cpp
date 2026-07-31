@@ -19,6 +19,8 @@ DisplayState SimulatedData::next(uint32_t nowMs) {
       pace,
       seconds / 8.7f / 5280.0f,
       hr,
+      135,
+      150,
       static_cast<uint32_t>(seconds),
       72,
       static_cast<uint32_t>(seconds) % 16 < 8,

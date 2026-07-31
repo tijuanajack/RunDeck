@@ -20,7 +20,8 @@ import android.os.SystemClock
 import com.rundeck.app.media.PhoneMediaState
 import com.rundeck.app.notifications.RunDeckNotificationPayload
 import com.rundeck.app.run.RunUiState
-import com.rundeck.app.run.LongRunTarget
+import com.rundeck.app.run.RunPreset
+import com.rundeck.app.run.RunPresetCatalog
 import com.rundeck.app.run.HrOwnershipMode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -95,6 +96,7 @@ class RunDeckBleClient(context: Context) {
     private var protocolStarted = false
     private var currentRunState: RunUiState? = null
     private var hrOwnershipMode = HrOwnershipMode.PhoneForwardedHr
+    private var currentPreset: RunPreset = RunPresetCatalog.longRun
     private var currentMediaState: PhoneMediaState = PhoneMediaState()
     private var currentDisplayContext = DisplayContextPacket("--:--", 2, false)
     private var lastPublishedRunActive: Boolean? = null
@@ -320,6 +322,12 @@ class RunDeckBleClient(context: Context) {
         currentRunState?.takeIf { it.active }?.let(::sendRunMetrics)
     }
 
+    fun setPreset(preset: RunPreset) {
+        currentPreset = preset
+        currentRunState?.let(::sendRunState)
+        currentRunState?.takeIf { it.active }?.let(::sendRunMetrics)
+    }
+
     fun publishMediaState(state: PhoneMediaState) {
         currentMediaState = state
         sendMediaState(state)
@@ -355,12 +363,12 @@ class RunDeckBleClient(context: Context) {
             nextSequence,
             RunStatePacket(
                 active = state.active,
-                presetName = "LONG RUN",
-                targetLabel = LongRunTarget.label,
-                paceLowSecondsPerMile = LongRunTarget.lowerSecondsPerMile,
-                paceHighSecondsPerMile = LongRunTarget.upperSecondsPerMile,
-                hrLowBpm = 135,
-                hrHighBpm = 150,
+                presetName = currentPreset.name,
+                targetLabel = currentPreset.targetLabel,
+                paceLowSecondsPerMile = currentPreset.lowerSecondsPerMile,
+                paceHighSecondsPerMile = currentPreset.upperSecondsPerMile,
+                hrLowBpm = currentPreset.hrLowBpm,
+                hrHighBpm = currentPreset.hrHighBpm,
             ),
         )
         _bridge.value = _bridge.value.copy(lastRunStateAckSequence = null, lastRunStateAckMs = 0, lastError = null)
@@ -388,8 +396,8 @@ class RunDeckBleClient(context: Context) {
             sequence.getAndIncrement() and 0xFFFF,
             SystemClock.elapsedRealtime() and 0xFFFF_FFFFL,
             LiveMetrics(
-                flags = 0x0003 or LongRunTarget.status(state.paceSecondsPerMile).packetFlag or
-                    LongRunTarget.heartRateStatus(if (hrOwnershipMode == HrOwnershipMode.PhoneForwardedHr) state.heartRateBpm else null).packetFlag or
+                flags = 0x0003 or currentPreset.paceStatus(state.paceSecondsPerMile).packetFlag or
+                    currentPreset.heartRateStatus(if (hrOwnershipMode == HrOwnershipMode.PhoneForwardedHr) state.heartRateBpm else null).packetFlag or
                     if (state.paused) 0x0020 else 0,
                 paceSecondsPerMile = pace,
                 distanceCentimeters = (state.distanceMeters * 100).roundToInt().toLong(),

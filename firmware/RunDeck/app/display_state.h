@@ -21,6 +21,8 @@ struct DisplayState {
   float paceMinutesPerMile;
   float distanceMiles;
   uint16_t heartRateBpm;
+  uint8_t heartRateLowBpm;
+  uint8_t heartRateHighBpm;
   uint32_t elapsedSeconds;
   int8_t temperatureF;
   bool mediaPlaying;

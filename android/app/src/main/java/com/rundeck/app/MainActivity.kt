@@ -61,8 +61,8 @@ import com.rundeck.app.run.HrOwnershipMode
 import com.rundeck.app.hr.HeartRateDevice
 import com.rundeck.app.run.RunSession
 import com.rundeck.app.run.RunTrackingService
-import com.rundeck.app.run.LongRunTarget
 import com.rundeck.app.run.RunCheckpointStore
+import com.rundeck.app.run.RunPreset
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -83,6 +83,7 @@ private fun RunDeckApp(viewModel: DeviceViewModel = viewModel()) {
     val media by viewModel.media.collectAsState()
     val notifications by viewModel.notifications.collectAsState()
     val hrOwnership by viewModel.hrOwnership.collectAsState()
+    val selectedPreset by viewModel.selectedPreset.collectAsState()
     val heartRateDevices by viewModel.heartRateDevices.collectAsState()
     val heartRate by viewModel.heartRate.collectAsState()
     val run by RunSession.state.collectAsState()
@@ -141,6 +142,7 @@ private fun RunDeckApp(viewModel: DeviceViewModel = viewModel()) {
                 run.active -> ActiveRunScreen(
                     run,
                     bridge,
+                    selectedPreset,
                     onPause = { context.startService(Intent(context, RunTrackingService::class.java).setAction(RunTrackingService.ACTION_PAUSE)) },
                     onResume = { context.startService(Intent(context, RunTrackingService::class.java).setAction(RunTrackingService.ACTION_RESUME)) },
                     onStop = {
@@ -162,6 +164,8 @@ private fun RunDeckApp(viewModel: DeviceViewModel = viewModel()) {
                 )
                 showRunSetup -> RunSetupScreen(
                     connected = connection is DeviceConnection.Ready,
+                    selectedPreset = selectedPreset,
+                    onPreset = viewModel::setPreset,
                     onStart = requestRun,
                     onBack = { showRunSetup = false },
                 )
@@ -430,16 +434,21 @@ private fun MediaCard(
 }
 
 @Composable
-private fun RunSetupScreen(connected: Boolean, onStart: () -> Unit, onBack: () -> Unit) = ScreenColumn {
+private fun RunSetupScreen(
+    connected: Boolean,
+    selectedPreset: RunPreset,
+    onPreset: (RunPreset) -> Unit,
+    onStart: () -> Unit,
+    onBack: () -> Unit,
+) = ScreenColumn {
     Text("‹  DEVICE", color = Cyan, fontWeight = FontWeight.Bold, modifier = Modifier.clickable(onClick = onBack))
     Spacer(Modifier.height(18.dp))
     BrandHeader("READY TO RUN")
     Spacer(Modifier.height(26.dp))
-    PresetCard("EASY", "HR 135–145", Color(0xFF91C84B))
-    Spacer(Modifier.height(12.dp))
-    PresetCard("STEADY", "PACE 8:45–9:00", Cyan)
-    Spacer(Modifier.height(12.dp))
-    PresetCard("LONG RUN", "10.0 MI   |   HR < 150   |   PACE 8:50–9:20", Lime, selected = true)
+    com.rundeck.app.run.RunPresetCatalog.all.forEachIndexed { index, preset ->
+        PresetCard(preset, selected = preset.id == selectedPreset.id, onClick = { onPreset(preset) })
+        if (index != com.rundeck.app.run.RunPresetCatalog.all.lastIndex) Spacer(Modifier.height(12.dp))
+    }
     Spacer(Modifier.weight(1f))
     Text(if (connected) "DISPLAY CONNECTED" else "PHONE-ONLY MODE", color = if (connected) Lime else Amber, fontSize = 13.sp, letterSpacing = 1.5.sp)
     Spacer(Modifier.height(10.dp))
@@ -452,6 +461,7 @@ private fun RunSetupScreen(connected: Boolean, onStart: () -> Unit, onBack: () -
 private fun ActiveRunScreen(
     state: com.rundeck.app.run.RunUiState,
     bridge: LiveBridgeStatus,
+    selectedPreset: RunPreset,
     onPause: () -> Unit,
     onResume: () -> Unit,
     onStop: () -> Unit,
@@ -473,8 +483,8 @@ private fun ActiveRunScreen(
         Metric("HR STRAP", state.heartRateBpm?.let { "$it BPM" } ?: "OFF")
     }
     Spacer(Modifier.height(20.dp))
-    val targetStatus = LongRunTarget.combinedStatus(state.paceSecondsPerMile, state.heartRateBpm)
-    Text("TARGET ${LongRunTarget.label}  •  ${targetStatus.label}", color = when (targetStatus) { is com.rundeck.app.run.CombinedTargetStatus.Pace -> when (targetStatus.status) { com.rundeck.app.run.PaceTargetStatus.OnTarget -> Lime; com.rundeck.app.run.PaceTargetStatus.GpsWeak -> Muted; else -> Amber }; com.rundeck.app.run.CombinedTargetStatus.GpsWeak -> Muted; else -> Color(0xFFFF5252) }, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally))
+    val targetStatus = selectedPreset.combinedStatus(state.paceSecondsPerMile, state.heartRateBpm)
+    Text("TARGET ${selectedPreset.targetLabel}  •  ${targetStatus.label}", color = when (targetStatus) { is com.rundeck.app.run.CombinedTargetStatus.Pace -> when (targetStatus.status) { com.rundeck.app.run.PaceTargetStatus.OnTarget -> Lime; com.rundeck.app.run.PaceTargetStatus.GpsWeak -> Muted; else -> Amber }; com.rundeck.app.run.CombinedTargetStatus.GpsWeak -> Muted; else -> Color(0xFFFF5252) }, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally))
     Spacer(Modifier.weight(1f))
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Button(onClick = if (state.paused) onResume else onPause, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF14232A), contentColor = White), modifier = Modifier.weight(1f).height(56.dp)) {
@@ -516,11 +526,13 @@ private fun ResumeRunScreen(
     Text(label, color = Muted, fontSize = 12.sp, letterSpacing = 1.sp)
 }
 
-@Composable private fun PresetCard(title: String, detail: String, accent: Color, selected: Boolean = false) = Column(
-    Modifier.fillMaxWidth().background(Color(0xFF0B0D10), RoundedCornerShape(16.dp)).padding(20.dp),
+@Composable
+private fun PresetCard(preset: RunPreset, selected: Boolean, onClick: () -> Unit) = Column(
+    Modifier.fillMaxWidth().background(if (selected) Color(0xFF182408) else Color(0xFF0B0D10), RoundedCornerShape(16.dp)).clickable(onClick = onClick).padding(20.dp),
 ) {
-    Text(title, color = if (selected) Lime else White, fontSize = 25.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp)
-    Spacer(Modifier.height(5.dp)); Text(detail, color = accent, fontWeight = FontWeight.Bold)
+    Text(preset.name, color = if (selected) Lime else White, fontSize = 25.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp)
+    Spacer(Modifier.height(5.dp)); Text(preset.detail, color = if (selected) Lime else Cyan, fontWeight = FontWeight.Bold)
+    if (selected) Text("SELECTED", color = Lime, fontSize = 11.sp, fontWeight = FontWeight.Black, letterSpacing = 1.5.sp, modifier = Modifier.padding(top = 8.dp))
 }
 
 @Composable private fun StatusCard(connection: DeviceConnection) {

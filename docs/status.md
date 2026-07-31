@@ -153,6 +153,13 @@ Last verified: 2026-07-30.
   so the splash exits when the phone connects even before a run begins.
   The unconnected splash now includes a compact `CONNECT TO RUNDECK APP`
   instruction beneath the artwork.
+- Preset selection checkpoint: Android now persists EASY, STEADY, or LONG RUN
+  selection locally, renders the selected row in Run Setup, and sends the
+  selected preset name, pace range, and HR range in the existing acknowledged
+  run-state packet. Live pace/HR status and the RunDeck dashboard use the same
+  selected rules; LONG RUN remains the default. Android tests/build and APK
+  install/launch passed on 2026-07-31; firmware compile/flash passed with
+  dynamic HR target rendering.
 - Notification end-to-end verification: the user confirmed a new test message
   appeared on RunDeck after selecting the message source. The phone listener,
   allowlist, BLE notification write, and device overlay are working together.
