@@ -153,8 +153,9 @@ planned work.
   ESP32 central/peripheral soak gate.
 - The firmware direct client is in `hr/direct_hr.*` and is deliberately
   gated by `kDirectHrSoakEnabled` in `RunDeck.ino`. The current test image
-  enables it only for the concurrent-role soak; keep the shipped/default value
-  disabled until Android peripheral throughput, HR reconnection, and UI
+  disrupted RunDeck discovery during the first soak attempt, so the current
+  shipped value is disabled again. Keep it disabled until the concurrency
+  design is revised and Android peripheral throughput, HR reconnection, and UI
   responsiveness are proven together.
 - Media metadata is now Android-to-device over characteristic `0003` as a
   bounded ASCII CBOR packet sourced from active Android MediaSession

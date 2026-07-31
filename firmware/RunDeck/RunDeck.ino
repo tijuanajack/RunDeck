@@ -21,7 +21,7 @@
 // OLED reset through TCA9554 EXIO0, and touch reset through EXIO1.
 // See AGENTS.md and docs/status.md before changing hardware startup.
 namespace {
-constexpr bool kDirectHrSoakEnabled = true;
+constexpr bool kDirectHrSoakEnabled = false;
 rundeck::SimulatedData simulator;
 rundeck::Dashboard dashboard;
 rundeck::RunDeckBle ble;
