@@ -141,10 +141,11 @@ planned work.
   work on that queue.
 - Messaging overlays are first-slice V1: Android forwards only clearable,
   likely message-style notifications through the existing notification-listener
-  service, sanitizes/truncates app/title/body, rate-limits to one overlay every
-  90 seconds, and writes an unfragmented CBOR packet on `0004`. Firmware shows
-  a 12-second modal overlay on any page and supports local swipe-down dismiss.
-  Full allowlist UI, Android dismissal ack, and fragmentation are not complete.
+  service, sanitizes/truncates app/title/body, suppresses exact duplicates for
+  90 seconds, allows distinct messages roughly every 8 seconds, and writes an
+  unfragmented CBOR packet on `0004`. Firmware shows a 12-second modal overlay
+  on any page and supports local swipe-down dismiss. Full allowlist UI, Android
+  dismissal ack, and fragmentation are not complete.
 - For the Long Run target, Android owns the 8:50–9:20 /mi rule. Do not hardcode
   a competing target on the display. Firmware currently renders the target and
   status flags sent by Android.

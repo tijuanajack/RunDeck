@@ -68,7 +68,8 @@ Current `Notification` payloads on `0004` are the first unfragmented V1 slice:
 a bounded CBOR map with `version`, `sequence`, `app`, `title`, and `body`.
 Android only forwards clearable, message-style notifications from likely
 messaging apps, sanitizes to printable ASCII, truncates app/title/body to
-16/32/96 bytes, and rate-limits overlays to at most one every 90 seconds.
+16/32/96 bytes, suppresses exact duplicates for 90 seconds, and allows
+distinct overlays roughly every 8 seconds.
 Firmware displays accepted notifications as a short-lived modal overlay and
 does not persist the content.
 

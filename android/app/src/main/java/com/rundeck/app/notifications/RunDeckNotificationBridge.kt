@@ -15,19 +15,21 @@ data class RunDeckNotificationPayload(
 )
 
 object RunDeckNotificationBridge {
-    private const val MIN_NOTIFICATION_INTERVAL_MS = 90_000L
+    private const val MIN_DISTINCT_NOTIFICATION_INTERVAL_MS = 8_000L
+    private const val DUPLICATE_SUPPRESSION_MS = 90_000L
     private val allowedPackageHints = listOf(
         "messag", "mms", "whatsapp", "signal", "telegram", "messenger",
     )
     private val _events = MutableSharedFlow<RunDeckNotificationPayload>(extraBufferCapacity = 4)
     val events: SharedFlow<RunDeckNotificationPayload> = _events.asSharedFlow()
     private var lastForwardedAtMs = 0L
+    private var lastSignature: String? = null
+    private var lastSignatureAtMs = 0L
 
     fun onNotificationPosted(context: Context, sbn: StatusBarNotification) {
         if (!sbn.isClearable || sbn.packageName == context.packageName) return
         if (!isAllowedMessageNotification(sbn)) return
         val now = SystemClock.elapsedRealtime()
-        if (now - lastForwardedAtMs < MIN_NOTIFICATION_INTERVAL_MS) return
 
         val extras = sbn.notification.extras
         val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()?.sanitize(32)
@@ -37,10 +39,18 @@ object RunDeckNotificationBridge {
             ?: return
         if (title.isBlank() || body.isBlank()) return
 
+        val app = appLabel(context, sbn.packageName).sanitize(16).ifBlank { "MESSAGE" }
+        val signature = "${sbn.packageName}|$title|$body"
+        val duplicate = signature == lastSignature && now - lastSignatureAtMs < DUPLICATE_SUPPRESSION_MS
+        if (duplicate) return
+        if (now - lastForwardedAtMs < MIN_DISTINCT_NOTIFICATION_INTERVAL_MS) return
+
+        lastSignature = signature
+        lastSignatureAtMs = now
         lastForwardedAtMs = now
         _events.tryEmit(
             RunDeckNotificationPayload(
-                app = appLabel(context, sbn.packageName).sanitize(16).ifBlank { "MESSAGE" },
+                app = app,
                 title = title,
                 body = body,
             ),
