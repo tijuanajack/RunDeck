@@ -147,8 +147,8 @@ Last verified: 2026-07-30.
   display every 30 seconds. Firmware renders live time/temperature only while
   context is fresh and reads the Waveshare GPIO17 battery ADC with GPIO16
   battery enable; invalid ADC values render `BAT --`. Firmware compiled and
-  flashed successfully on 2026-07-31; Android build passed, but APK install
-  remains pending until the Samsung is visible to ADB.
+  flashed successfully on 2026-07-31; Android build passed and the updated APK
+  installed/launched on the attached Samsung with no fatal startup crash.
 - The selected V1 Long Run target is 8:50–9:20 /mi. Android derives
   `ON TARGET`, `EASE OFF`, `PICK IT UP`, or `GPS WEAK` and sends that state to
   the display. Active-run distance, elapsed time, and pace are checkpointed
