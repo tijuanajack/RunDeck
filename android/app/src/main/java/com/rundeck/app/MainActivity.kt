@@ -3,8 +3,10 @@ package com.rundeck.app
 import android.Manifest
 import android.app.Application
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -45,6 +47,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rundeck.app.ble.DeviceConnection
@@ -185,7 +190,21 @@ private fun RunDeckApp(viewModel: DeviceViewModel = viewModel()) {
     var showRunSetup by remember { mutableStateOf(false) }
     var checkpoint by remember { mutableStateOf<com.rundeck.app.run.RunUiState?>(null) }
     val context = androidx.compose.ui.platform.LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var backgroundRunAllowed by remember {
+        mutableStateOf(isIgnoringBatteryOptimizations(context))
+    }
     val checkpointStore = remember { RunCheckpointStore(context) }
+
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                backgroundRunAllowed = isIgnoringBatteryOptimizations(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     LaunchedEffect(Unit) {
         checkpoint = checkpointStore.load()
@@ -261,6 +280,17 @@ private fun RunDeckApp(viewModel: DeviceViewModel = viewModel()) {
                     onNotificationForwarding = viewModel::setNotificationForwarding,
                     onNotificationAllowAll = viewModel::setNotificationAllowAll,
                     onNotificationSourceAllowed = viewModel::setNotificationSourceAllowed,
+                    backgroundRunAllowed = backgroundRunAllowed,
+                    onAllowBackgroundRuns = {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            context.startActivity(
+                                Intent(
+                                    Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                                    Uri.parse("package:${context.packageName}"),
+                                ),
+                            )
+                        }
+                    },
                 )
             }
         }
@@ -284,6 +314,8 @@ private fun DeviceSetupScreen(
     onNotificationForwarding: (Boolean) -> Unit,
     onNotificationAllowAll: (Boolean) -> Unit,
     onNotificationSourceAllowed: (String, Boolean) -> Unit,
+    backgroundRunAllowed: Boolean,
+    onAllowBackgroundRuns: () -> Unit,
 ) = Column(
     Modifier
         .fillMaxSize()
@@ -310,11 +342,60 @@ private fun DeviceSetupScreen(
         onNotificationAllowAll,
         onNotificationSourceAllowed,
     )
+    Spacer(Modifier.height(14.dp))
+    ResilienceCard(backgroundRunAllowed, onAllowBackgroundRuns)
     if (connection is DeviceConnection.Ready) {
         Spacer(Modifier.weight(1f))
         PrimaryButton("CONTINUE TO RUN SETUP", onContinue)
     }
 }
+
+private fun isIgnoringBatteryOptimizations(context: android.content.Context): Boolean {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return true
+    val powerManager = context.getSystemService(PowerManager::class.java)
+    return powerManager?.isIgnoringBatteryOptimizations(context.packageName) == true
+}
+
+@Composable
+private fun ResilienceCard(allowed: Boolean, onAllow: () -> Unit) =
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(Color(0xFF080A0D), RoundedCornerShape(16.dp))
+            .padding(18.dp),
+    ) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("BACKGROUND RUNS", color = Cyan, fontSize = 13.sp, letterSpacing = 2.sp)
+            Text(
+                if (allowed) "READY" else "REVIEW",
+                color = if (allowed) Lime else Amber,
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.sp,
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "Keeps GPS and BLE active when the phone screen is locked.",
+            color = Muted,
+            fontSize = 13.sp,
+        )
+        Spacer(Modifier.height(12.dp))
+        if (allowed) {
+            Text("Screen-lock protection is enabled.", color = Lime, fontSize = 13.sp)
+        } else {
+            PrimaryButton("ALLOW BACKGROUND RUNS", onAllow)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Samsung will ask you to allow RunDeck to run without battery restrictions. Nothing changes until you approve it.",
+                color = Muted,
+                fontSize = 11.sp,
+            )
+        }
+    }
 
 @Composable
 private fun NotificationCard(

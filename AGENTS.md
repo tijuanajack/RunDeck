@@ -122,6 +122,9 @@ planned work.
   production-grade paused-state rendering path, but first-slice device-origin
   commands over characteristic `0005` now exist; keep them clearly labeled as
   pending physical verification.
+- Device Setup exposes a user-controlled BACKGROUND RUNS battery-optimization
+  exemption flow. It must remain opt-in and must be rechecked after returning
+  from Android Settings; never attempt to change the exemption silently.
 - Media metadata is now Android-to-device over characteristic `0003` as a
   bounded ASCII CBOR packet sourced from active Android MediaSession
   controllers. The Android app has phone-side previous/play-pause/next buttons,

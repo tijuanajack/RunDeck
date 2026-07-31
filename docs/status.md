@@ -158,9 +158,9 @@ Last verified: 2026-07-30.
   moving-time state every second between GPS callbacks so the BLE stream does
   not depend on a screen refresh. Android tests/build passed on 2026-07-31;
   the updated APK installed/launched successfully on the attached Samsung.
-  A dedicated foreground BLE service and Samsung battery-optimization
-  guidance remain the next resilience step if lock testing still shows
-  dropouts.
+  Device Setup now reports whether Android battery optimization exempts
+  RunDeck and provides an explicit user-approved request flow for that
+  exemption; the app never changes this setting silently.
 - Run-control/Stats checkpoint: RunDeck now exposes a swipe-up RUN CONTROLS
   panel with PAUSE/RESUME and STOP RUN buttons. Actions travel as `0005`
   device events to Android's foreground run service, and paused state is
@@ -193,9 +193,10 @@ Last verified: 2026-07-30.
   off/unavailable until an actual HR source is connected. Garmin HRM-Dual
   direct mode, concurrent central/peripheral soak testing, and phone-forwarded
   HR remain future work.
-- Full notification allowlisting/dismissal, weather location before a run,
-  touch lock,
-  brightness/power work, and real-run outdoor validation remain future work.
+- Notification dismissal acknowledgements and contact-level filtering,
+  weather location before a run, touch lock, brightness/power work, and
+  real-run outdoor validation remain future work. App-level message-source
+  selection and 90-second duplicate suppression are implemented.
 - The scripted flash helper deliberately refuses to choose between multiple
   serial ports. When the phone is also attached, identify the Espressif USB
   JTAG port via `udevadm` and use that explicit port.
@@ -207,10 +208,11 @@ Last verified: 2026-07-30.
    Restore factory immediately on any failed cold boot.
 2. Physically verify the new swipe-up Run Controls panel and device-origin
    pause/resume/stop, then polish tap-size/debounce issues found.
-3. Polish notifications: add explicit dismissal acknowledgements and permitted
-   contact-level filtering,
-   then add weather freshness, settings, touch lock/brightness, resilience
-   tests, and outdoor/power validation.
+3. On the Samsung, review the new BACKGROUND RUNS card and approve the
+   battery-optimization exemption before a screen-lock run test. Then polish
+   notifications with explicit dismissal acknowledgements and permitted
+   contact-level filtering, followed by touch lock/brightness and
+   outdoor/power validation.
 4. Add optional HR: phone-forwarded HR and target/combined pace-HR status
    rules first, then evaluate direct Garmin HRM-Dual only behind the
    BLE-concurrency soak gate. The strap must be treated as absent when not
