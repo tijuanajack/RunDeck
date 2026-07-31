@@ -40,6 +40,7 @@ object RunDeckNotificationBridge {
 
         candidates.forEach { candidate ->
             if (candidate.title.isBlank() || candidate.body.isBlank()) return@forEach
+            if (!RunDeckNotificationPreferences.isContactAllowed(context, sbn.packageName, candidate.title)) return@forEach
             val signature = "${sbn.packageName}|${candidate.title}|${candidate.body}"
             if (recentSignatures.containsKey(signature)) return@forEach
             recentSignatures[signature] = now

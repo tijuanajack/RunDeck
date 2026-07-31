@@ -177,8 +177,12 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
         RunDeckNotificationPreferences.setForwardingEnabled(getApplication(), enabled)
     fun setNotificationAllowAll(allowAll: Boolean) =
         RunDeckNotificationPreferences.setAllowAllMessageApps(getApplication(), allowAll)
+    fun setNotificationContactsAll(allowAll: Boolean) =
+        RunDeckNotificationPreferences.setAllowAllContacts(getApplication(), allowAll)
     fun setNotificationSourceAllowed(packageName: String, allowed: Boolean) =
         RunDeckNotificationPreferences.setSourceAllowed(getApplication(), packageName, allowed)
+    fun setNotificationContactAllowed(packageName: String, sender: String, allowed: Boolean) =
+        RunDeckNotificationPreferences.setContactAllowed(getApplication(), packageName, sender, allowed)
     override fun onCleared() {
         mediaController.close()
         bleClient.close()
@@ -285,7 +289,9 @@ private fun RunDeckApp(viewModel: DeviceViewModel = viewModel()) {
                     onNext = viewModel::nextTrack,
                     onNotificationForwarding = viewModel::setNotificationForwarding,
                     onNotificationAllowAll = viewModel::setNotificationAllowAll,
+                    onNotificationContactsAll = viewModel::setNotificationContactsAll,
                     onNotificationSourceAllowed = viewModel::setNotificationSourceAllowed,
+                    onNotificationContactAllowed = viewModel::setNotificationContactAllowed,
                     backgroundRunAllowed = backgroundRunAllowed,
                     onAllowBackgroundRuns = {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -319,7 +325,9 @@ private fun DeviceSetupScreen(
     onNext: () -> Unit,
     onNotificationForwarding: (Boolean) -> Unit,
     onNotificationAllowAll: (Boolean) -> Unit,
+    onNotificationContactsAll: (Boolean) -> Unit,
     onNotificationSourceAllowed: (String, Boolean) -> Unit,
+    onNotificationContactAllowed: (String, String, Boolean) -> Unit,
     backgroundRunAllowed: Boolean,
     onAllowBackgroundRuns: () -> Unit,
 ) = Column(
@@ -346,7 +354,9 @@ private fun DeviceSetupScreen(
         onEnableMedia,
         onNotificationForwarding,
         onNotificationAllowAll,
+        onNotificationContactsAll,
         onNotificationSourceAllowed,
+        onNotificationContactAllowed,
     )
     Spacer(Modifier.height(14.dp))
     ResilienceCard(backgroundRunAllowed, onAllowBackgroundRuns)
@@ -409,7 +419,9 @@ private fun NotificationCard(
     onOpenAccess: () -> Unit,
     onForwarding: (Boolean) -> Unit,
     onAllowAll: (Boolean) -> Unit,
+    onContactsAll: (Boolean) -> Unit,
     onSourceAllowed: (String, Boolean) -> Unit,
+    onContactAllowed: (String, String, Boolean) -> Unit,
 ) = Column(Modifier.fillMaxWidth().background(Color(0xFF080A0D), RoundedCornerShape(16.dp)).padding(18.dp)) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
         Text("MESSAGES", color = Lime, fontSize = 13.sp, letterSpacing = 2.sp)
@@ -455,6 +467,38 @@ private fun NotificationCard(
                 Spacer(Modifier.height(6.dp))
                 Text("Selected-only mode has no sources enabled, so message overlays are effectively muted.", color = Amber, fontSize = 12.sp)
             }
+        }
+    }
+    Spacer(Modifier.height(12.dp))
+    Text("CONTACT FILTER", color = Cyan, fontSize = 12.sp, letterSpacing = 2.sp)
+    Spacer(Modifier.height(6.dp))
+    Text("Optional sender-level filtering for the selected message apps.", color = Muted, fontSize = 12.sp)
+    Spacer(Modifier.height(8.dp))
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Button(onClick = { onContactsAll(true) }, colors = ButtonDefaults.buttonColors(containerColor = if (settings.allowAllContacts) Lime else Color(0xFF14232A), contentColor = if (settings.allowAllContacts) Black else White), modifier = Modifier.weight(1f).height(42.dp), shape = RoundedCornerShape(10.dp)) {
+            Text("ALL CONTACTS", fontWeight = FontWeight.Black, fontSize = 12.sp)
+        }
+        Button(onClick = { onContactsAll(false) }, colors = ButtonDefaults.buttonColors(containerColor = if (!settings.allowAllContacts) Lime else Color(0xFF14232A), contentColor = if (!settings.allowAllContacts) Black else White), modifier = Modifier.weight(1f).height(42.dp), shape = RoundedCornerShape(10.dp)) {
+            Text("SELECTED", fontWeight = FontWeight.Black, fontSize = 12.sp)
+        }
+    }
+    if (!settings.allowAllContacts) {
+        Spacer(Modifier.height(8.dp))
+        if (settings.contacts.isEmpty()) {
+            Text("Send a test message to discover contacts.", color = Amber, fontSize = 12.sp)
+        } else {
+            settings.contacts.forEach { contact ->
+                Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                    Column(Modifier.weight(1f)) {
+                        Text(contact.sender, color = White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text(contact.packageName, color = Muted, fontSize = 11.sp)
+                    }
+                    Button(onClick = { onContactAllowed(contact.packageName, contact.sender, !contact.allowed) }, colors = ButtonDefaults.buttonColors(containerColor = if (contact.allowed) Lime else Color(0xFF14232A), contentColor = if (contact.allowed) Black else White), modifier = Modifier.height(36.dp), shape = RoundedCornerShape(10.dp)) {
+                        Text(if (contact.allowed) "ON" else "OFF", fontWeight = FontWeight.Black, fontSize = 12.sp)
+                    }
+                }
+            }
+            if (settings.selectedContactCount == 0) Text("Selected-only mode has no contacts enabled, so message overlays are muted.", color = Amber, fontSize = 12.sp)
         }
     }
 }

@@ -130,6 +130,9 @@ planned work.
   to an in-memory clearable notification key while the listener is connected.
   Never persist notification content or keys, and never dismiss a source that
   was not forwarded as clearable.
+- Contact filtering is opt-in: ALL CONTACTS remains the default, while
+  SELECTED mode matches sanitized sender labels within each source package.
+  Do not broaden it to infer contacts from unsanitized notification content.
 - Media metadata is now Android-to-device over characteristic `0003` as a
   bounded ASCII CBOR packet sourced from active Android MediaSession
   controllers. The Android app has phone-side previous/play-pause/next buttons,

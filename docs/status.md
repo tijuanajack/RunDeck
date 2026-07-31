@@ -130,8 +130,8 @@ Last verified: 2026-07-30.
   selected-sources mode, source discovery for common installed message apps and
   observed notification packages, and local persistence. Android tests/build
   passed on 2026-07-31; the updated APK was installed and launched on the
-  attached Samsung after reconnecting ADB. Contact-level allowlisting and
-  fragmented long notifications remain future work.
+  attached Samsung after reconnecting ADB. Fragmented long notifications
+  remain future work.
 - Device Setup usability checkpoint: the setup screen now scrolls on the
   phone, so the Messages card's ALL APPS / SELECTED controls and source rows
   are reachable on a full-height device. Android tests/build and install/launch
@@ -144,6 +144,10 @@ Last verified: 2026-07-30.
   keeps only a short in-memory sequence-to-clearable-key map and asks the
   user-enabled notification listener to dismiss that source notification;
   nothing is persisted and non-clearable notifications are never forwarded.
+- Contact filter checkpoint: Device Setup now offers ALL CONTACTS (the
+  compatibility default) or SELECTED sender mode. Observed sender names are
+  sanitized and stored locally with their source package; selected mode must
+  be explicitly enabled and does not forward undiscovered senders.
 - Environment context checkpoint: Android now formats local time and fetches
   current Fahrenheit temperature from Open-Meteo using the active GPS fix,
   caching it with a ten-minute refresh limit and explicit stale/unavailable
@@ -196,7 +200,7 @@ Last verified: 2026-07-30.
   off/unavailable until an actual HR source is connected. Garmin HRM-Dual
   direct mode, concurrent central/peripheral soak testing, and phone-forwarded
   HR remain future work.
-- Contact-level filtering,
+- Fragmented long notifications,
   weather location before a run, touch lock, brightness/power work, and
   real-run outdoor validation remain future work. App-level message-source
   selection and 90-second duplicate suppression are implemented.

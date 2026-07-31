@@ -14,20 +14,32 @@ data class RunDeckNotificationSource(
     val allowed: Boolean,
 )
 
+data class RunDeckNotificationContact(
+    val packageName: String,
+    val sender: String,
+    val allowed: Boolean,
+)
+
 data class RunDeckNotificationSettings(
     val forwardingEnabled: Boolean = true,
     val allowAllMessageApps: Boolean = true,
+    val allowAllContacts: Boolean = true,
     val sources: List<RunDeckNotificationSource> = emptyList(),
+    val contacts: List<RunDeckNotificationContact> = emptyList(),
 ) {
     val selectedCount: Int = sources.count { it.allowed }
+    val selectedContactCount: Int = contacts.count { it.allowed }
 }
 
 object RunDeckNotificationPreferences {
     private const val PREFS = "rundeck_notification_prefs"
     private const val KEY_FORWARDING_ENABLED = "forwarding_enabled"
     private const val KEY_ALLOW_ALL_MESSAGE_APPS = "allow_all_message_apps"
+    private const val KEY_ALLOW_ALL_CONTACTS = "allow_all_contacts"
     private const val KEY_ALLOWED_PACKAGES = "allowed_packages"
+    private const val KEY_ALLOWED_CONTACTS = "allowed_contacts"
     private const val KEY_OBSERVED_SOURCES = "observed_sources"
+    private const val KEY_OBSERVED_CONTACTS = "observed_contacts"
     private const val ENTRY_SEPARATOR = "\t"
 
     private val knownMessagePackages = listOf(
@@ -56,6 +68,14 @@ object RunDeckNotificationPreferences {
         return settings.sources.any { it.packageName == packageName && it.allowed }
     }
 
+    fun isContactAllowed(context: Context, packageName: String, sender: String): Boolean {
+        val appContext = context.applicationContext
+        rememberContact(appContext, packageName, sender)
+        val settings = currentSettings(appContext)
+        if (settings.allowAllContacts) return true
+        return settings.contacts.any { it.packageName == packageName && it.sender == sender && it.allowed }
+    }
+
     fun setForwardingEnabled(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_FORWARDING_ENABLED, enabled).apply()
         refresh(context.applicationContext)
@@ -66,11 +86,25 @@ object RunDeckNotificationPreferences {
         refresh(context.applicationContext)
     }
 
+    fun setAllowAllContacts(context: Context, allowAll: Boolean) {
+        prefs(context).edit().putBoolean(KEY_ALLOW_ALL_CONTACTS, allowAll).apply()
+        refresh(context.applicationContext)
+    }
+
     fun setSourceAllowed(context: Context, packageName: String, allowed: Boolean) {
         val prefs = prefs(context)
         val allowedPackages = prefs.getStringSet(KEY_ALLOWED_PACKAGES, emptySet()).orEmpty().toMutableSet()
         if (allowed) allowedPackages.add(packageName) else allowedPackages.remove(packageName)
         prefs.edit().putStringSet(KEY_ALLOWED_PACKAGES, allowedPackages).apply()
+        refresh(context.applicationContext)
+    }
+
+    fun setContactAllowed(context: Context, packageName: String, sender: String, allowed: Boolean) {
+        val key = contactKey(packageName, sender) ?: return
+        val prefs = prefs(context)
+        val allowedContacts = prefs.getStringSet(KEY_ALLOWED_CONTACTS, emptySet()).orEmpty().toMutableSet()
+        if (allowed) allowedContacts.add(key) else allowedContacts.remove(key)
+        prefs.edit().putStringSet(KEY_ALLOWED_CONTACTS, allowedContacts).apply()
         refresh(context.applicationContext)
     }
 
@@ -87,6 +121,16 @@ object RunDeckNotificationPreferences {
         refresh(context.applicationContext)
     }
 
+    fun rememberContact(context: Context, packageName: String, sender: String) {
+        val key = contactKey(packageName, sender) ?: return
+        val prefs = prefs(context)
+        val contacts = readObservedContacts(prefs).toMutableMap()
+        if (contacts[key] == sender.sanitizePreferenceLabel()) return
+        contacts[key] = sender.sanitizePreferenceLabel()
+        prefs.edit().putStringSet(KEY_OBSERVED_CONTACTS, contacts.toEntries()).apply()
+        refresh(context.applicationContext)
+    }
+
     private fun currentSettings(context: Context): RunDeckNotificationSettings {
         refresh(context)
         return _settings.value
@@ -96,9 +140,12 @@ object RunDeckNotificationPreferences {
         val prefs = prefs(context)
         val allowedPackages = prefs.getStringSet(KEY_ALLOWED_PACKAGES, emptySet()).orEmpty()
         val observedSources = readObservedSources(prefs)
+        val observedContacts = readObservedContacts(prefs)
+        val allowedContacts = prefs.getStringSet(KEY_ALLOWED_CONTACTS, emptySet()).orEmpty()
         _settings.value = RunDeckNotificationSettings(
             forwardingEnabled = prefs.getBoolean(KEY_FORWARDING_ENABLED, true),
             allowAllMessageApps = prefs.getBoolean(KEY_ALLOW_ALL_MESSAGE_APPS, true),
+            allowAllContacts = prefs.getBoolean(KEY_ALLOW_ALL_CONTACTS, true),
             sources = observedSources
                 .map { (packageName, label) ->
                     RunDeckNotificationSource(
@@ -108,6 +155,13 @@ object RunDeckNotificationPreferences {
                     )
                 }
                 .sortedWith(compareBy<RunDeckNotificationSource> { !it.allowed }.thenBy { it.label.lowercase() }),
+            contacts = observedContacts.map { (key, sender) ->
+                RunDeckNotificationContact(
+                    packageName = key.substringBefore(ENTRY_SEPARATOR),
+                    sender = sender,
+                    allowed = key in allowedContacts,
+                )
+            }.sortedWith(compareBy<RunDeckNotificationContact> { !it.allowed }.thenBy { it.sender.lowercase() }),
         )
     }
 
@@ -141,8 +195,25 @@ object RunDeckNotificationPreferences {
             }
             .toMap()
 
+    private fun readObservedContacts(prefs: SharedPreferences): Map<String, String> =
+        prefs.getStringSet(KEY_OBSERVED_CONTACTS, emptySet()).orEmpty()
+            .mapNotNull { entry ->
+                val parts = entry.split(ENTRY_SEPARATOR, limit = 2)
+                if (parts.size == 2 && parts[0].isNotBlank() && parts[1].isNotBlank()) {
+                    parts[0] to parts[1]
+                } else null
+            }
+            .toMap()
+
     private fun Map<String, String>.toEntries(): Set<String> =
         entries.map { (packageName, label) -> "$packageName$ENTRY_SEPARATOR${label.sanitizePreferenceLabel()}" }.toSet()
+
+    private fun contactKey(packageName: String, sender: String): String? {
+        val cleanPackage = packageName.trim()
+        val cleanSender = sender.sanitizePreferenceLabel()
+        if (cleanPackage.isBlank() || cleanSender.isBlank()) return null
+        return "$cleanPackage$ENTRY_SEPARATOR$cleanSender"
+    }
 
     private fun prefs(context: Context): SharedPreferences =
         context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
