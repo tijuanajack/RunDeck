@@ -22,6 +22,8 @@
 // OLED reset through TCA9554 EXIO0, and touch reset through EXIO1.
 // See AGENTS.md and docs/status.md before changing hardware startup.
 namespace {
+// Direct-device HR remains disabled until the concurrent central/peripheral
+// soak passes without disrupting Android's RunDeck connection.
 constexpr bool kDirectHrSoakEnabled = false;
 rundeck::SimulatedData simulator;
 rundeck::Dashboard dashboard;
