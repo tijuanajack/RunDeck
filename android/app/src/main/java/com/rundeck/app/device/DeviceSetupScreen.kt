@@ -70,6 +70,7 @@ fun DeviceSetupScreen(
     onConnectHeartRate: (HeartRateDevice) -> Unit,
     backgroundRunAllowed: Boolean,
     onAllowBackgroundRuns: () -> Unit,
+    onUseWeatherLocation: () -> Unit,
 ) = Column(
     Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 42.dp),
 ) {
@@ -90,6 +91,8 @@ fun DeviceSetupScreen(
     Spacer(Modifier.height(14.dp))
     ResilienceCard(backgroundRunAllowed, onAllowBackgroundRuns)
     Spacer(Modifier.height(14.dp))
+    WeatherLocationCard(onUseWeatherLocation)
+    Spacer(Modifier.height(14.dp))
     HrModeCard(hrOwnership, onHrOwnershipMode)
     Spacer(Modifier.height(14.dp))
     HeartRateCard(heartRate, heartRateDevices, onScanHeartRate, onConnectHeartRate)
@@ -97,6 +100,20 @@ fun DeviceSetupScreen(
         Spacer(Modifier.height(24.dp))
         PrimaryButton("CONTINUE TO RUN SETUP", onContinue)
     }
+}
+
+@Composable
+private fun WeatherLocationCard(onUseLocation: () -> Unit) = Column(
+    Modifier.fillMaxWidth().background(Color(0xFF080A0D), RoundedCornerShape(16.dp)).padding(18.dp),
+) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        androidx.compose.material3.Text("WEATHER", color = Amber, fontSize = 13.sp, letterSpacing = 2.sp)
+        androidx.compose.material3.Text("OPEN-METEO", color = Muted, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+    }
+    Spacer(Modifier.height(8.dp))
+    androidx.compose.material3.Text("Use the phone's recent location so temperature is available before a run starts.", color = Muted, fontSize = 13.sp)
+    Spacer(Modifier.height(12.dp))
+    PrimaryButton("USE PHONE LOCATION", onUseLocation)
 }
 
 @Composable

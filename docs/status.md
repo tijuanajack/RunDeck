@@ -267,8 +267,10 @@ Last verified: 2026-07-30.
   phone-forwarded HR source remain future work; the ownership selector and
   safe packet gating are now in place. Physical strap pairing and a real HR
   run are the next verification gate.
-- Weather location before a run, brightness/power work, and
-  real-run outdoor validation remain future work. App-level message-source
+- Brightness/power work and
+  real-run outdoor validation remain future work. Setup now offers a
+  permission-gated recent-phone-location weather seed; the provider still
+  refreshes at most every ten minutes and marks stale results. App-level message-source
   selection and 90-second duplicate suppression are implemented.
 - The scripted flash helper deliberately refuses to choose between multiple
   serial ports. When the phone is also attached, identify the Espressif USB

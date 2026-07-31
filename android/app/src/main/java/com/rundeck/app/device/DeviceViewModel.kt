@@ -1,7 +1,10 @@
 package com.rundeck.app.device
 
 import android.app.Application
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.location.LocationManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.rundeck.app.ble.DeviceMediaControl
@@ -43,6 +46,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     private val mediaController = PhoneMediaController(application)
     private val weatherProvider = OpenMeteoWeather()
     private val heartRateClient = HeartRateClient(application)
+    private var weatherCoordinates: Pair<Double, Double>? = null
 
     val devices = bleClient.devices
     val connection = bleClient.connection
@@ -116,8 +120,11 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
             while (isActive) {
                 val run = RunSession.state.value
                 val nowMs = System.currentTimeMillis()
-                val latitude = run.latitude
-                val longitude = run.longitude
+                val coordinates = if (run.latitude != null && run.longitude != null) {
+                    run.latitude!! to run.longitude!!
+                } else weatherCoordinates
+                val latitude = coordinates?.first
+                val longitude = coordinates?.second
                 if (latitude != null && longitude != null && nowMs - lastWeatherFetchMs >= 10 * 60 * 1_000L) {
                     weather = weatherProvider.fetch(latitude, longitude, nowMs)
                     lastWeatherFetchMs = nowMs
@@ -158,6 +165,17 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
         RunDeckNotificationPreferences.setContactAllowed(getApplication(), packageName, sender, allowed)
     fun setHrOwnershipMode(mode: HrOwnershipMode) = HrOwnershipPreferences.set(getApplication(), mode)
     fun setPreset(preset: RunPreset) = RunPresetPreferences.set(getApplication(), preset)
+    @Suppress("MissingPermission")
+    fun seedWeatherFromLastKnownLocation() {
+        val context = getApplication<Application>()
+        if (context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
+            context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
+        val manager = context.getSystemService(LocationManager::class.java) ?: return
+        val location = manager.allProviders.asSequence()
+            .mapNotNull { provider -> runCatching { manager.getLastKnownLocation(provider) }.getOrNull() }
+            .maxByOrNull { it.time } ?: return
+        weatherCoordinates = location.latitude to location.longitude
+    }
     fun scanHeartRate() = heartRateClient.scan()
     fun connectHeartRate(device: HeartRateDevice) = heartRateClient.connect(device)
 

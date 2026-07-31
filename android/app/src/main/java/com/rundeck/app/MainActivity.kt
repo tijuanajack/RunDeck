@@ -135,6 +135,21 @@ private fun RunDeckApp(viewModel: DeviceViewModel = viewModel()) {
         }
         runPermissions.launch(permissions.toTypedArray())
     }
+    val weatherPermissions = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) { result ->
+        if (result[Manifest.permission.ACCESS_FINE_LOCATION] == true || result[Manifest.permission.ACCESS_COARSE_LOCATION] == true) {
+            viewModel.seedWeatherFromLastKnownLocation()
+        }
+    }
+    val requestWeatherLocation = {
+        if (context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED ||
+            context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            viewModel.seedWeatherFromLastKnownLocation()
+        } else {
+            weatherPermissions.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+        }
+    }
 
     MaterialTheme {
         Surface(color = Black, modifier = Modifier.fillMaxSize()) {
@@ -202,6 +217,7 @@ private fun RunDeckApp(viewModel: DeviceViewModel = viewModel()) {
                             )
                         }
                     },
+                    onUseWeatherLocation = requestWeatherLocation,
                 )
             }
         }
