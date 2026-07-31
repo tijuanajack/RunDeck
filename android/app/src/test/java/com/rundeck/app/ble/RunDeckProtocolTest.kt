@@ -81,6 +81,20 @@ class RunDeckProtocolTest {
         assert(payload.size <= RunDeckProtocol.MAX_NOTIFICATION_BYTES)
     }
 
+    @Test fun `long notification is split into bounded ordered fragments`() {
+        val fragments = RunDeckProtocol.fragmentNotification(
+            46,
+            NotificationPacket("Messages", "Ellen", "x".repeat(96)),
+        )
+        assert(fragments.size > 1)
+        fragments.forEachIndexed { index, fragment ->
+            assert(fragment.size <= RunDeckProtocol.NOTIFICATION_FRAGMENT_MAX_BYTES)
+            assertEquals(index, fragment[4].toInt() and 0xFF)
+            assertEquals(fragments.size, fragment[5].toInt() and 0xFF)
+            assertEquals(RunDeckProtocol.NOTIFICATION_FRAGMENT_TYPE, fragment[1])
+        }
+    }
+
     @Test fun `display context encodes clock and stale-safe weather fields`() {
         val payload = RunDeckProtocol.encodeDisplayContext(
             47,

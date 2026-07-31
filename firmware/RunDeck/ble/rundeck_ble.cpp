@@ -29,6 +29,11 @@ constexpr size_t kFrameBytes = kHeaderBytes + kLiveMetricsBytes;
 constexpr size_t kRunStateMaxBytes = 128;
 constexpr size_t kMediaMaxBytes = 160;
 constexpr size_t kNotificationMaxBytes = 192;
+constexpr uint8_t kNotificationFragmentType = 2;
+constexpr size_t kNotificationFragmentHeaderBytes = 9;
+constexpr size_t kNotificationFragmentChunkBytes = 11;
+constexpr size_t kNotificationFragmentMaxBytes = kNotificationFragmentHeaderBytes + kNotificationFragmentChunkBytes;
+constexpr uint32_t kNotificationAssemblyTimeoutMs = 5000;
 constexpr size_t kDisplayContextMaxBytes = 96;
 constexpr size_t kHeartbeatBytes = 9;
 constexpr uint32_t kMetricsFreshForMs = 5000;
@@ -106,6 +111,13 @@ uint16_t lastNotificationSequence = 0;
 uint32_t notificationReceivedAtMs = 0;
 bool haveNotification = false;
 bool haveNotificationSequence = false;
+uint8_t notificationAssembly[kNotificationMaxBytes] = {};
+uint16_t notificationAssemblySequence = 0;
+uint8_t notificationAssemblyIndex = 0;
+uint8_t notificationAssemblyCount = 0;
+uint16_t notificationAssemblyTotal = 0;
+uint32_t notificationAssemblyStartedAtMs = 0;
+bool notificationAssemblyActive = false;
 DisplayContextConfig latestDisplayContext{0, 2, false, 0, "--:--"};
 uint16_t lastDisplayContextSequence = 0;
 uint32_t displayContextReceivedAtMs = 0;
@@ -494,13 +506,46 @@ MediaCallbacks mediaCallbacks;
 class NotificationCallbacks : public NimBLECharacteristicCallbacks {
   void onWrite(NimBLECharacteristic* characteristic, NimBLEConnInfo&) override {
     const std::string value = characteristic->getValue();
+    if (value.size() < kNotificationFragmentHeaderBytes || value.size() > kNotificationFragmentMaxBytes) return;
+    const auto* input = reinterpret_cast<const uint8_t*>(value.data());
+    if (input[0] != kProtocolVersion || input[1] != kNotificationFragmentType || u16(input + 8) != 0) return;
+    const uint16_t sequence = u16(input + 2);
+    const uint8_t index = input[4];
+    const uint8_t count = input[5];
+    const uint16_t total = u16(input + 6);
+    const size_t chunk = value.size() - kNotificationFragmentHeaderBytes;
+    const uint8_t expectedCount = static_cast<uint8_t>((total + kNotificationFragmentChunkBytes - 1) / kNotificationFragmentChunkBytes);
+    if (total == 0 || total > kNotificationMaxBytes || count == 0 || count != expectedCount || index >= count ||
+        (index + 1 < count && chunk != kNotificationFragmentChunkBytes) ||
+        index * kNotificationFragmentChunkBytes + chunk > total) return;
+
+    const uint32_t now = millis();
+    if (!notificationAssemblyActive || now - notificationAssemblyStartedAtMs > kNotificationAssemblyTimeoutMs || index == 0) {
+      if (index != 0) return;
+      notificationAssemblyActive = true;
+      notificationAssemblySequence = sequence;
+      notificationAssemblyIndex = 0;
+      notificationAssemblyCount = count;
+      notificationAssemblyTotal = total;
+      notificationAssemblyStartedAtMs = now;
+    }
+    if (!notificationAssemblyActive || sequence != notificationAssemblySequence || index != notificationAssemblyIndex ||
+        count != notificationAssemblyCount || total != notificationAssemblyTotal) return;
+    memcpy(notificationAssembly + index * kNotificationFragmentChunkBytes,
+           input + kNotificationFragmentHeaderBytes, chunk);
+    notificationAssemblyIndex++;
+    if (notificationAssemblyIndex != notificationAssemblyCount) return;
+
     NotificationConfig decoded{};
-    if (!decodeNotification(reinterpret_cast<const uint8_t*>(value.data()), value.size(), &decoded)) return;
+    if (!decodeNotification(notificationAssembly, notificationAssemblyTotal, &decoded)) {
+      notificationAssemblyActive = false;
+      return;
+    }
 
     portENTER_CRITICAL(&metricsMux);
     const bool replayed = haveNotificationSequence &&
         static_cast<int16_t>(decoded.sequence - lastNotificationSequence) <= 0;
-    if (!replayed) {
+    if (!replayed && decoded.sequence == sequence) {
       latestNotification = decoded;
       lastNotificationSequence = decoded.sequence;
       notificationReceivedAtMs = millis();
@@ -508,6 +553,7 @@ class NotificationCallbacks : public NimBLECharacteristicCallbacks {
       haveNotificationSequence = true;
     }
     portEXIT_CRITICAL(&metricsMux);
+    notificationAssemblyActive = false;
   }
 };
 

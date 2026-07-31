@@ -346,11 +346,13 @@ class RunDeckBleClient(context: Context) {
         val nextSequence = sequence.getAndIncrement() and 0xFFFF
         notificationKeys[nextSequence] = payload.notificationKey
         while (notificationKeys.size > 16) notificationKeys.remove(notificationKeys.entries.first().key)
-        val frame = RunDeckProtocol.encodeNotification(
+        pendingGattOps.removeAll { it.label == OP_NOTIFICATION }
+        RunDeckProtocol.fragmentNotification(
             nextSequence,
             NotificationPacket(payload.app, payload.title, payload.body),
-        )
-        queueWrite(characteristic, frame, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT, OP_NOTIFICATION)
+        ).forEach { frame ->
+            queueWrite(characteristic, frame, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT, OP_NOTIFICATION)
+        }
     }
 
     fun publishDisplayContext(context: DisplayContextPacket) {

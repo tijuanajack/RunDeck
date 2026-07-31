@@ -130,8 +130,8 @@ Last verified: 2026-07-30.
   selected-sources mode, source discovery for common installed message apps and
   observed notification packages, and local persistence. Android tests/build
   passed on 2026-07-31; the updated APK was installed and launched on the
-  attached Samsung after reconnecting ADB. Fragmented long notifications
-  remain future work.
+  attached Samsung after reconnecting ADB. Long notifications now use bounded,
+  ordered BLE fragments with device-side reassembly and timeout/replay checks.
 - Device Setup usability checkpoint: the setup screen now scrolls on the
   phone, so the Messages card's ALL APPS / SELECTED controls and source rows
   are reachable on a full-height device. Android tests/build and install/launch
@@ -266,8 +266,7 @@ Last verified: 2026-07-30.
   phone-forwarded HR source remain future work; the ownership selector and
   safe packet gating are now in place. Physical strap pairing and a real HR
   run are the next verification gate.
-- Fragmented long notifications,
-  weather location before a run, brightness/power work, and
+- Weather location before a run, brightness/power work, and
   real-run outdoor validation remain future work. App-level message-source
   selection and 90-second duplicate suppression are implemented.
 - The scripted flash helper deliberately refuses to choose between multiple

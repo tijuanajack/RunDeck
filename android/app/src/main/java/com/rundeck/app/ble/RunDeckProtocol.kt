@@ -35,6 +35,10 @@ object RunDeckProtocol {
     const val MAX_RUN_STATE_BYTES = 128
     const val MAX_MEDIA_STATE_BYTES = 160
     const val MAX_NOTIFICATION_BYTES = 192
+    const val NOTIFICATION_FRAGMENT_TYPE: Byte = 2
+    const val NOTIFICATION_FRAGMENT_HEADER_BYTES = 9
+    const val NOTIFICATION_FRAGMENT_CHUNK_BYTES = 11
+    const val NOTIFICATION_FRAGMENT_MAX_BYTES = NOTIFICATION_FRAGMENT_HEADER_BYTES + NOTIFICATION_FRAGMENT_CHUNK_BYTES
     const val MAX_DISPLAY_CONTEXT_BYTES = 96
     const val HEARTBEAT_BYTES = 9
 
@@ -281,6 +285,23 @@ object RunDeckProtocol {
         output.writeTextEntry(NOTIFICATION_KEY_TITLE, payload.title)
         output.writeTextEntry(NOTIFICATION_KEY_BODY, payload.body)
         return output.toByteArray().also { require(it.size <= MAX_NOTIFICATION_BYTES) }
+    }
+
+    /** Splits the bounded CBOR notification into write-sized, ordered fragments. */
+    fun fragmentNotification(sequence: Int, payload: NotificationPacket): List<ByteArray> {
+        val encoded = encodeNotification(sequence, payload)
+        val count = (encoded.size + NOTIFICATION_FRAGMENT_CHUNK_BYTES - 1) / NOTIFICATION_FRAGMENT_CHUNK_BYTES
+        require(count in 1..255)
+        return (0 until count).map { index ->
+            val offset = index * NOTIFICATION_FRAGMENT_CHUNK_BYTES
+            val length = minOf(NOTIFICATION_FRAGMENT_CHUNK_BYTES, encoded.size - offset)
+            ByteBuffer.allocate(NOTIFICATION_FRAGMENT_MAX_BYTES).order(ByteOrder.LITTLE_ENDIAN).apply {
+                put(VERSION).put(NOTIFICATION_FRAGMENT_TYPE).putShort(sequence.toShort())
+                put(index.toByte()).put(count.toByte()).putShort(encoded.size.toShort()).put(0)
+                put(encoded, offset, length)
+                while (position() < NOTIFICATION_FRAGMENT_MAX_BYTES) put(0)
+            }.array().copyOf(NOTIFICATION_FRAGMENT_HEADER_BYTES + length)
+        }
     }
 
     /** Phone-owned clock/weather context, refreshed while the display is connected. */
