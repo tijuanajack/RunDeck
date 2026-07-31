@@ -25,8 +25,10 @@ constexpr size_t kLiveMetricsBytes = 21;
 constexpr size_t kFrameBytes = kHeaderBytes + kLiveMetricsBytes;
 constexpr size_t kRunStateMaxBytes = 128;
 constexpr size_t kMediaMaxBytes = 160;
+constexpr size_t kNotificationMaxBytes = 192;
 constexpr uint32_t kMetricsFreshForMs = 5000;
 constexpr uint32_t kMediaFreshForMs = 30000;
+constexpr uint32_t kNotificationVisibleForMs = 12000;
 
 struct LiveMetrics {
   uint16_t flags;
@@ -59,6 +61,13 @@ struct MediaConfig {
   char artist[33];
 };
 
+struct NotificationConfig {
+  uint16_t sequence;
+  char app[17];
+  char title[33];
+  char body[97];
+};
+
 portMUX_TYPE metricsMux = portMUX_INITIALIZER_UNLOCKED;
 LiveMetrics latest{};
 uint32_t receivedAtMs = 0;
@@ -76,6 +85,11 @@ uint16_t lastMediaSequence = 0;
 uint32_t mediaReceivedAtMs = 0;
 bool haveMedia = false;
 bool haveMediaSequence = false;
+NotificationConfig latestNotification{0, "TEXT", "", ""};
+uint16_t lastNotificationSequence = 0;
+uint32_t notificationReceivedAtMs = 0;
+bool haveNotification = false;
+bool haveNotificationSequence = false;
 NimBLECharacteristic* deviceEventCharacteristic = nullptr;
 uint16_t deviceEventSequence = 0;
 
@@ -241,6 +255,36 @@ bool decodeMediaState(const uint8_t* input, size_t size, MediaConfig* decoded) {
   return true;
 }
 
+bool decodeNotification(const uint8_t* input, size_t size, NotificationConfig* decoded) {
+  if (size == 0 || size > kNotificationMaxBytes) return false;
+  CborReader reader(input, size);
+  uint8_t entries = 0;
+  if (!reader.readMap(&entries) || entries != 5) return false;
+
+  uint32_t version = 0;
+  uint32_t sequence = 0;
+  NotificationConfig candidate{};
+  bool seenVersion = false, seenSequence = false, seenApp = false, seenTitle = false, seenBody = false;
+
+  for (uint8_t i = 0; i < entries; ++i) {
+    uint32_t key = 0;
+    if (!reader.readUInt(&key)) return false;
+    switch (key) {
+      case 0: seenVersion = reader.readUInt(&version); break;
+      case 1: seenSequence = reader.readUInt(&sequence); break;
+      case 2: seenApp = reader.readText(candidate.app, sizeof(candidate.app)); break;
+      case 3: seenTitle = reader.readText(candidate.title, sizeof(candidate.title)); break;
+      case 4: seenBody = reader.readText(candidate.body, sizeof(candidate.body)); break;
+      default: return false;
+    }
+  }
+  if (!reader.done() || !seenVersion || !seenSequence || !seenApp || !seenTitle || !seenBody) return false;
+  if (version != kProtocolVersion || sequence > 0xFFFF) return false;
+  candidate.sequence = static_cast<uint16_t>(sequence);
+  *decoded = candidate;
+  return true;
+}
+
 void notifyAck(uint16_t sequence, uint8_t commandType, uint8_t status) {
   if (!deviceEventCharacteristic) return;
   const uint8_t payload[] = {
@@ -352,6 +396,28 @@ class MediaCallbacks : public NimBLECharacteristicCallbacks {
 
 MediaCallbacks mediaCallbacks;
 
+class NotificationCallbacks : public NimBLECharacteristicCallbacks {
+  void onWrite(NimBLECharacteristic* characteristic, NimBLEConnInfo&) override {
+    const std::string value = characteristic->getValue();
+    NotificationConfig decoded{};
+    if (!decodeNotification(reinterpret_cast<const uint8_t*>(value.data()), value.size(), &decoded)) return;
+
+    portENTER_CRITICAL(&metricsMux);
+    const bool replayed = haveNotificationSequence &&
+        static_cast<int16_t>(decoded.sequence - lastNotificationSequence) <= 0;
+    if (!replayed) {
+      latestNotification = decoded;
+      lastNotificationSequence = decoded.sequence;
+      notificationReceivedAtMs = millis();
+      haveNotification = true;
+      haveNotificationSequence = true;
+    }
+    portEXIT_CRITICAL(&metricsMux);
+  }
+};
+
+NotificationCallbacks notificationCallbacks;
+
 class ServerCallbacks : public NimBLEServerCallbacks {
   void onDisconnect(NimBLEServer*, NimBLEConnInfo&, int) override {
     NimBLEDevice::startAdvertising();
@@ -379,7 +445,9 @@ void RunDeckBle::begin() {
   NimBLECharacteristic* media = service->createCharacteristic(
       kMediaUuid, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR);
   media->setCallbacks(&mediaCallbacks);
-  addWritable(service, kNotificationUuid);
+  NimBLECharacteristic* notification = service->createCharacteristic(
+      kNotificationUuid, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR);
+  notification->setCallbacks(&notificationCallbacks);
   deviceEventCharacteristic = service->createCharacteristic(
       kDeviceEventUuid, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY | NIMBLE_PROPERTY::WRITE);
   service->createCharacteristic(kSettingsUuid, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
@@ -446,6 +514,31 @@ void RunDeckBle::applyMediaState(DisplayState* state, uint32_t nowMs) {
   state->mediaArtist = artist;
 }
 
+void RunDeckBle::applyNotificationState(DisplayState* state, uint32_t nowMs) {
+  uint32_t receivedAt = 0;
+  bool valid = false;
+  const char* app = "";
+  const char* title = "";
+  const char* body = "";
+  portENTER_CRITICAL(&metricsMux);
+  valid = haveNotification;
+  receivedAt = notificationReceivedAtMs;
+  if (valid) {
+    app = latestNotification.app;
+    title = latestNotification.title;
+    body = latestNotification.body;
+  }
+  portEXIT_CRITICAL(&metricsMux);
+
+  const bool visible = valid && nowMs - receivedAt <= kNotificationVisibleForMs;
+  state->notificationVisible = visible;
+  if (visible) {
+    state->notificationApp = app;
+    state->notificationTitle = title;
+    state->notificationBody = body;
+  }
+}
+
 void RunDeckBle::notifyMediaControl(MediaControlAction action) {
   notifyDeviceMediaControl(action);
 }
@@ -470,9 +563,6 @@ bool RunDeckBle::applyLiveMetrics(DisplayState* state, uint32_t nowMs) {
   state->heartRateBpm = metrics.heartRateBpm;
   state->temperatureF = static_cast<int8_t>(metrics.temperatureDeciF / 10);
   applyRunState(state, nowMs);
-  // Notifications are not yet supplied by Android. Never leak the simulator's
-  // periodic mock text overlay into a real live run.
-  state->notificationVisible = false;
   if (metrics.flags & 0x0004) state->statusText = "ON TARGET";
   else if (metrics.flags & 0x0008) state->statusText = "EASE OFF";
   else if (metrics.flags & 0x0010) state->statusText = "PICK IT UP";

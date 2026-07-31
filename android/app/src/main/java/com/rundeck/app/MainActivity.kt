@@ -52,6 +52,7 @@ import com.rundeck.app.ble.LiveBridgeStatus
 import com.rundeck.app.ble.RunDeckBleClient
 import com.rundeck.app.media.PhoneMediaController
 import com.rundeck.app.media.PhoneMediaState
+import com.rundeck.app.notifications.RunDeckNotificationBridge
 import com.rundeck.app.run.RunSession
 import com.rundeck.app.run.RunTrackingService
 import com.rundeck.app.run.LongRunTarget
@@ -91,6 +92,9 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
                     DeviceMediaControl.Next -> mediaController.next()
                 }
             }
+        }
+        viewModelScope.launch {
+            RunDeckNotificationBridge.events.collect(bleClient::publishNotification)
         }
     }
     fun scan() = bleClient.startScan()

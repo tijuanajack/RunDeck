@@ -18,6 +18,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import com.rundeck.app.media.PhoneMediaState
+import com.rundeck.app.notifications.RunDeckNotificationPayload
 import com.rundeck.app.run.RunUiState
 import com.rundeck.app.run.LongRunTarget
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -84,6 +85,7 @@ class RunDeckBleClient(context: Context) {
     private var liveMetrics: BluetoothGattCharacteristic? = null
     private var runState: BluetoothGattCharacteristic? = null
     private var mediaMetadata: BluetoothGattCharacteristic? = null
+    private var notificationPayload: BluetoothGattCharacteristic? = null
     private var deviceEvents: BluetoothGattCharacteristic? = null
     private val demoHandler = Handler(Looper.getMainLooper())
     private var streamingDemoMetrics = false
@@ -150,8 +152,9 @@ class RunDeckBleClient(context: Context) {
             liveMetrics = service?.getCharacteristic(RunDeckProtocol.LIVE_METRICS_UUID)
             runState = service?.getCharacteristic(RunDeckProtocol.RUN_STATE_UUID)
             mediaMetadata = service?.getCharacteristic(RunDeckProtocol.MEDIA_UUID)
+            notificationPayload = service?.getCharacteristic(RunDeckProtocol.NOTIFICATION_UUID)
             deviceEvents = service?.getCharacteristic(RunDeckProtocol.DEVICE_EVENT_UUID)
-            _connection.value = if (status == BluetoothGatt.GATT_SUCCESS && liveMetrics != null && runState != null && mediaMetadata != null && deviceEvents != null) {
+            _connection.value = if (status == BluetoothGatt.GATT_SUCCESS && liveMetrics != null && runState != null && mediaMetadata != null && notificationPayload != null && deviceEvents != null) {
                 _bridge.value = _bridge.value.copy(connected = true, lastError = null)
                 enableDeviceEventNotifications()
                 beginProtocolStream()
@@ -176,6 +179,13 @@ class RunDeckBleClient(context: Context) {
                         _bridge.value.copy(connected = true, lastMediaWriteConfirmedMs = SystemClock.elapsedRealtime(), lastError = null)
                     } else {
                         _bridge.value.copy(lastError = "MEDIA WRITE FAILED ($status)")
+                    }
+                }
+                RunDeckProtocol.NOTIFICATION_UUID -> {
+                    _bridge.value = if (status == BluetoothGatt.GATT_SUCCESS) {
+                        _bridge.value.copy(connected = true, lastError = null)
+                    } else {
+                        _bridge.value.copy(lastError = "NOTIFICATION WRITE FAILED ($status)")
                     }
                 }
                 RunDeckProtocol.LIVE_METRICS_UUID -> {
@@ -289,6 +299,15 @@ class RunDeckBleClient(context: Context) {
     fun publishMediaState(state: PhoneMediaState) {
         currentMediaState = state
         sendMediaState(state)
+    }
+
+    fun publishNotification(payload: RunDeckNotificationPayload) {
+        val characteristic = notificationPayload ?: return
+        val frame = RunDeckProtocol.encodeNotification(
+            sequence.getAndIncrement() and 0xFFFF,
+            NotificationPacket(payload.app, payload.title, payload.body),
+        )
+        queueWrite(characteristic, frame, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT, OP_NOTIFICATION)
     }
 
     private fun sendRunState(state: RunUiState) {
@@ -510,6 +529,7 @@ class RunDeckBleClient(context: Context) {
         gatt?.close(); gatt = null; liveMetrics = null
         runState = null
         mediaMetadata = null
+        notificationPayload = null
         deviceEvents = null
         pendingGattOps.clear()
         gattOperationInFlight = false
@@ -523,6 +543,7 @@ class RunDeckBleClient(context: Context) {
         liveMetrics = null
         runState = null
         mediaMetadata = null
+        notificationPayload = null
         deviceEvents = null
         pendingGattOps.clear()
         gattOperationInFlight = false
@@ -554,6 +575,7 @@ class RunDeckBleClient(context: Context) {
         liveMetrics = null
         runState = null
         mediaMetadata = null
+        notificationPayload = null
         deviceEvents = null
         pendingGattOps.clear()
         gattOperationInFlight = false
@@ -579,6 +601,7 @@ class RunDeckBleClient(context: Context) {
         const val OP_RUN_STATE = "RUN STATE"
         const val OP_METRIC = "METRIC"
         const val OP_MEDIA = "MEDIA"
+        const val OP_NOTIFICATION = "NOTIFICATION"
         const val OP_ACK_READ = "ACK READ"
         const val OP_EVENT_SUBSCRIBE = "EVENT SUBSCRIBE"
         val CCCD_UUID: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")

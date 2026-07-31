@@ -29,6 +29,9 @@ DisplayState SimulatedData::next(uint32_t nowMs) {
       "M83",
       "Midnight City",
       "M83",
+      "TEXT",
+      "ELLEN",
+      "I'M LEAVING WORK NOW.\nNEED ANYTHING?",
   };
 }
 

@@ -29,6 +29,7 @@ object RunDeckProtocol {
     const val DEVICE_EVENT_ACK_BYTES = 8
     const val MAX_RUN_STATE_BYTES = 128
     const val MAX_MEDIA_STATE_BYTES = 160
+    const val MAX_NOTIFICATION_BYTES = 192
 
     private const val RUN_KEY_VERSION = 0
     private const val RUN_KEY_SEQUENCE = 1
@@ -47,6 +48,12 @@ object RunDeckProtocol {
     private const val MEDIA_KEY_SOURCE = 4
     private const val MEDIA_KEY_TITLE = 5
     private const val MEDIA_KEY_ARTIST = 6
+
+    private const val NOTIFICATION_KEY_VERSION = 0
+    private const val NOTIFICATION_KEY_SEQUENCE = 1
+    private const val NOTIFICATION_KEY_APP = 2
+    private const val NOTIFICATION_KEY_TITLE = 3
+    private const val NOTIFICATION_KEY_BODY = 4
 
     fun encodeLiveMetrics(sequence: Int, sourceMonotonicMs: Long, metrics: LiveMetrics): ByteArray {
         require(sequence in 0..0xFFFF)
@@ -225,6 +232,21 @@ object RunDeckProtocol {
         return DecodedMediaStatePacket(requireNotNull(sequence), decoded)
     }
 
+    fun encodeNotification(sequence: Int, payload: NotificationPacket): ByteArray {
+        require(sequence in 0..0xFFFF)
+        require(payload.app.length <= 16)
+        require(payload.title.length <= 32)
+        require(payload.body.length <= 96)
+        val output = ByteArrayOutputStream()
+        output.write(0xA5)
+        output.writeUintEntry(NOTIFICATION_KEY_VERSION, VERSION.toInt())
+        output.writeUintEntry(NOTIFICATION_KEY_SEQUENCE, sequence)
+        output.writeTextEntry(NOTIFICATION_KEY_APP, payload.app)
+        output.writeTextEntry(NOTIFICATION_KEY_TITLE, payload.title)
+        output.writeTextEntry(NOTIFICATION_KEY_BODY, payload.body)
+        return output.toByteArray().also { require(it.size <= MAX_NOTIFICATION_BYTES) }
+    }
+
     private fun ByteArrayOutputStream.writeUintEntry(key: Int, value: Int) {
         writeUInt(key)
         writeUInt(value)
@@ -337,3 +359,9 @@ data class MediaStatePacket(
 )
 
 data class DecodedMediaStatePacket(val sequence: Int, val state: MediaStatePacket)
+
+data class NotificationPacket(
+    val app: String,
+    val title: String,
+    val body: String,
+)

@@ -64,6 +64,14 @@ sanitized by Android, truncated to 240 UTF-8 bytes, and fragmented with
 `messageId`, `fragmentIndex`, and `fragmentCount`; firmware permits at most
 four outstanding fragments and expires incomplete messages after 10 seconds.
 
+Current `Notification` payloads on `0004` are the first unfragmented V1 slice:
+a bounded CBOR map with `version`, `sequence`, `app`, `title`, and `body`.
+Android only forwards clearable, message-style notifications from likely
+messaging apps, sanitizes to printable ASCII, truncates app/title/body to
+16/32/96 bytes, and rate-limits overlays to at most one every 90 seconds.
+Firmware displays accepted notifications as a short-lived modal overlay and
+does not persist the content.
+
 Important Android-to-device commands (run state, dismissal, settings write)
 carry a command ID and produce one `0005` acknowledgement containing that ID
 and a success/error code. No notification content is persisted on the device.

@@ -115,6 +115,17 @@ Last verified: 2026-07-30.
   title/artist visible when MediaSession metadata ages instead of replacing it
   with `MEDIA STALE`. Firmware compile and flash to `/dev/ttyACM0` were
   hash-verified on 2026-07-30.
+- Messaging overlay checkpoint: the existing Android notification-listener
+  service now forwards only clearable, likely message-style notifications,
+  sanitizes app/title/body to printable ASCII, truncates them to bounded V1
+  lengths, and rate-limits overlays to one every 90 seconds. Android sends an
+  unfragmented CBOR notification payload on characteristic `0004`. Firmware
+  validates/stores that packet, shows a 12-second modal overlay on any RunDeck
+  screen, and supports local swipe-down dismissal. Android tests/build passed,
+  APK install/launch passed, and firmware compile/flash to `/dev/ttyACM0` were
+  hash-verified on 2026-07-30. Full app/contact allowlist UI, Android-side
+  dismissal acknowledgements, and fragmented long notifications remain future
+  work.
 - The selected V1 Long Run target is 8:50–9:20 /mi. Android derives
   `ON TARGET`, `EASE OFF`, `PICK IT UP`, or `GPS WEAK` and sends that state to
   the display. Active-run distance, elapsed time, and pace are checkpointed
@@ -132,13 +143,14 @@ Last verified: 2026-07-30.
   run-state/preset packet, and Android can read back the first run-state ACK.
   Phone-side pause/resume/stop exists, Android-to-device media metadata is
   wired, and device-origin Music-screen controls are implemented pending user
-  confirmation. Device-origin pause/resume/stop commands, notification,
+  confirmation. First messaging overlays are wired. Device-origin
+  pause/resume/stop commands, notification dismissal acknowledgements,
   settings, and heartbeat contracts are not implemented end-to-end.
 - Heart rate remains optional. Live phone-GPS runs display the Garmin strap as
   off/unavailable until an actual HR source is connected. Garmin HRM-Dual
   direct mode, concurrent central/peripheral soak testing, and phone-forwarded
   HR remain future work.
-- Notification allowlisting/dismissal, Open-Meteo, touch lock,
+- Full notification allowlisting/dismissal, Open-Meteo, touch lock,
   brightness/power work, and real-run outdoor validation remain future work.
 - The scripted flash helper deliberately refuses to choose between multiple
   serial ports. When the phone is also attached, identify the Espressif USB
@@ -153,8 +165,8 @@ Last verified: 2026-07-30.
    works on the phone, then polish any tap-size/debounce issues found.
 3. Continue V1 run-state protocol: add device-origin pause/resume/stop command
    flow and show paused state on the display.
-4. Add notification allowlist, sanitization, modal payloads, and permitted
-   dismissal acknowledgements; then add weather freshness, settings, touch
+4. Polish notifications: add explicit allowlist UI and permitted dismissal
+   acknowledgements; then add weather freshness, settings, touch
    lock/brightness, resilience tests, and outdoor/power validation.
 5. Add optional HR: phone-forwarded HR and target/combined pace-HR status
    rules first, then evaluate direct Garmin HRM-Dual only behind the

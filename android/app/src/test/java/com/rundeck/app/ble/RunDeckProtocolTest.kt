@@ -66,6 +66,16 @@ class RunDeckProtocolTest {
         RunDeckProtocol.decodeMediaState(ByteArray(RunDeckProtocol.MAX_MEDIA_STATE_BYTES + 1))
     }
 
+    @Test fun `notification payload encodes bounded text`() {
+        val payload = RunDeckProtocol.encodeNotification(
+            46,
+            NotificationPacket(app = "Messages", title = "Ellen", body = "Leaving now"),
+        )
+
+        assertEquals(0xA5, payload[0].toInt() and 0xFF)
+        assert(payload.size <= RunDeckProtocol.MAX_NOTIFICATION_BYTES)
+    }
+
     @Test fun `device ack event decodes command and sequence`() {
         val event = RunDeckProtocol.decodeDeviceEvent(byteArrayOf(
             1,

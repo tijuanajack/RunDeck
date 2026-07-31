@@ -15,6 +15,8 @@ class RunDeckBle {
   void applyRunState(DisplayState* state, uint32_t nowMs);
   /** Applies the last accepted Android MediaSession metadata, if present. */
   void applyMediaState(DisplayState* state, uint32_t nowMs);
+  /** Applies the last short-lived Android notification overlay, if present. */
+  void applyNotificationState(DisplayState* state, uint32_t nowMs);
   /** Sends a tapped Music-screen control to Android over device events. */
   void notifyMediaControl(MediaControlAction action);
   /** Returns true only when a fresh Android metrics frame was applied. */

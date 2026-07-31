@@ -131,7 +131,7 @@ void Dashboard::show(Screen page) {
   page_ = page;
   pace_ = paceTarget_ = distance_ = elapsed_ = hr_ = hrTarget_ = media_ = nullptr;
   mediaSource_ = mediaTrack_ = mediaArtist_ = mediaPlayButton_ = musicFooter_ = nullptr;
-  notification_ = nullptr;
+  notification_ = notificationApp_ = notificationTitle_ = notificationBody_ = nullptr;
   lv_obj_clean(content_);
   switch (page_) {
     case Screen::Ready: buildReady(); break;
@@ -139,6 +139,7 @@ void Dashboard::show(Screen page) {
     case Screen::Stats: buildStats(); break;
     case Screen::Dashboard: buildDashboard(); break;
   }
+  if (!notification_) buildNotification();
   updateDashboard();
 }
 
@@ -181,7 +182,6 @@ void Dashboard::buildDashboard() {
   lv_label_set_text(bluetooth, "BT");
   lv_obj_t* battery = label(content_, &lv_font_montserrat_16, LV_ALIGN_BOTTOM_RIGHT, -18, -26);
   lv_label_set_text(battery, "BAT 82%");
-  buildNotification();
 }
 
 void Dashboard::buildMusic() {
@@ -260,17 +260,35 @@ void Dashboard::buildReady() {
 void Dashboard::buildNotification() {
   notification_ = panel(content_, 64, 90, 472, 258, kCyan);
   lv_obj_add_flag(notification_, LV_OBJ_FLAG_GESTURE_BUBBLE);
-  lv_obj_t* app = label(notification_, &lv_font_montserrat_20, LV_ALIGN_TOP_LEFT, 28, 24, kCyan);
-  lv_label_set_text(app, "TEXT");
-  lv_obj_t* sender = label(notification_, &lv_font_montserrat_36, LV_ALIGN_TOP_LEFT, 28, 56);
-  lv_label_set_text(sender, "ELLEN");
+  notificationApp_ = label(notification_, &lv_font_montserrat_20, LV_ALIGN_TOP_LEFT, 28, 24, kCyan);
+  notificationTitle_ = label(notification_, &lv_font_montserrat_36, LV_ALIGN_TOP_LEFT, 28, 56);
+  lv_obj_set_width(notificationTitle_, 416);
+  lv_label_set_long_mode(notificationTitle_, LV_LABEL_LONG_DOT);
   line(notification_, 28, 112, 416);
-  lv_obj_t* body = label(notification_, &lv_font_montserrat_20, LV_ALIGN_TOP_LEFT, 28, 130);
-  lv_label_set_text(body, "I'M LEAVING WORK NOW.\nNEED ANYTHING?");
+  notificationBody_ = label(notification_, &lv_font_montserrat_20, LV_ALIGN_TOP_LEFT, 28, 130);
+  lv_obj_set_width(notificationBody_, 416);
+  lv_label_set_long_mode(notificationBody_, LV_LABEL_LONG_WRAP);
   line(notification_, 28, 206, 416);
   lv_obj_t* dismiss = label(notification_, &lv_font_montserrat_20, LV_ALIGN_BOTTOM_MID, 0, -18, kCyan);
   lv_label_set_text(dismiss, "SWIPE DOWN TO DISMISS");
   lv_obj_add_flag(notification_, LV_OBJ_FLAG_HIDDEN);
+}
+
+void Dashboard::updateNotificationOverlay() {
+  if (!notification_) return;
+  if (state_.notificationVisible && !notificationDismissed_) {
+    const char* app = state_.notificationApp ? state_.notificationApp : "MESSAGE";
+    const char* title = state_.notificationTitle ? state_.notificationTitle : "";
+    const char* body = state_.notificationBody ? state_.notificationBody : "";
+    if (strcmp(lv_label_get_text(notificationApp_), app) != 0) lv_label_set_text(notificationApp_, app);
+    if (strcmp(lv_label_get_text(notificationTitle_), title) != 0) lv_label_set_text(notificationTitle_, title);
+    if (strcmp(lv_label_get_text(notificationBody_), body) != 0) lv_label_set_text(notificationBody_, body);
+    lv_obj_clear_flag(notification_, LV_OBJ_FLAG_HIDDEN);
+  }
+  if (!state_.notificationVisible) {
+    notificationDismissed_ = false;
+    lv_obj_add_flag(notification_, LV_OBJ_FLAG_HIDDEN);
+  }
 }
 
 void Dashboard::updateDashboard() {
@@ -298,9 +316,13 @@ void Dashboard::updateDashboard() {
                hrValue);
     }
     lv_label_set_text(musicFooter_, value);
+    updateNotificationOverlay();
     return;
   }
-  if (page_ != Screen::Dashboard || !pace_) return;
+  if (page_ != Screen::Dashboard || !pace_) {
+    updateNotificationOverlay();
+    return;
+  }
   const char* status = state_.statusText ? state_.statusText : "READY";
   const char* target = state_.targetLabel ? state_.targetLabel : "8:50-9:20";
   if (state_.paceMinutesPerMile <= 0.0f) {
@@ -328,11 +350,7 @@ void Dashboard::updateDashboard() {
   lv_obj_set_style_text_color(hr_, heartRateLive ? kWhite : kMuted, 0);
   lv_obj_set_style_text_color(hrTarget_, heartRateLive ? kLime : kMuted, 0);
   snprintf(value, sizeof(value), "%s\n%s", title, artist); lv_label_set_text(media_, value);
-  if (notification_ && state_.notificationVisible && !notificationDismissed_) lv_obj_clear_flag(notification_, LV_OBJ_FLAG_HIDDEN);
-  if (notification_ && !state_.notificationVisible) {
-    notificationDismissed_ = false;
-    lv_obj_add_flag(notification_, LV_OBJ_FLAG_HIDDEN);
-  }
+  updateNotificationOverlay();
 }
 
 void Dashboard::render(const DisplayState& state) {

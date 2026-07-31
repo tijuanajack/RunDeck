@@ -29,11 +29,15 @@ class Dashboard {
   void buildStats();
   void buildReady();
   void buildNotification();
+  void updateNotificationOverlay();
   void updateDashboard();
 
   lv_obj_t* root_ = nullptr;
   lv_obj_t* content_ = nullptr;
   lv_obj_t* notification_ = nullptr;
+  lv_obj_t* notificationApp_ = nullptr;
+  lv_obj_t* notificationTitle_ = nullptr;
+  lv_obj_t* notificationBody_ = nullptr;
   Screen page_ = Screen::Dashboard;
   DisplayState state_{};
   bool notificationDismissed_ = false;

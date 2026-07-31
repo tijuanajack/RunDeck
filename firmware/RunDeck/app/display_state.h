@@ -31,6 +31,9 @@ struct DisplayState {
   const char* mediaSource;
   const char* mediaTitle;
   const char* mediaArtist;
+  const char* notificationApp;
+  const char* notificationTitle;
+  const char* notificationBody;
 };
 
 }  // namespace rundeck
