@@ -136,6 +136,12 @@ Last verified: 2026-07-30.
   phone, so the Messages card's ALL APPS / SELECTED controls and source rows
   are reachable on a full-height device. Android tests/build and install/launch
   passed on 2026-07-31.
+- Reconnect resilience checkpoint: Android now treats a transient protocol
+  discovery failure like a link loss, closes the stale GATT session, and
+  retries the remembered RunDeck address up to twelve times with bounded
+  backoff. The phone shows a reconnecting state instead of requiring a fresh
+  manual discovery after every short display/BLE restart. Android unit tests,
+  debug build, install, and launch passed on 2026-07-31.
 - Notification end-to-end verification: the user confirmed a new test message
   appeared on RunDeck after selecting the message source. The phone listener,
   allowlist, BLE notification write, and device overlay are working together.
@@ -246,8 +252,8 @@ Last verified: 2026-07-30.
 
 ## Next implementation order
 
-1. Continue BLE/live phone metrics polish and reconnect visibility; re-run the
-   full-UI cold-boot gate three times when the user can physically test it.
+1. Re-run the full-UI cold-boot gate three times and verify the new saved-device
+   reconnect path when the user can physically test it.
    Restore factory immediately on any failed cold boot.
 2. Physically verify the new swipe-up Run Controls panel and device-origin
    pause/resume/stop, then polish tap-size/debounce issues found.

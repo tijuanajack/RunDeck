@@ -165,14 +165,17 @@ class RunDeckBleClient(context: Context) {
             notificationPayload = service?.getCharacteristic(RunDeckProtocol.NOTIFICATION_UUID)
             displayContext = service?.getCharacteristic(RunDeckProtocol.SETTINGS_UUID)
             deviceEvents = service?.getCharacteristic(RunDeckProtocol.DEVICE_EVENT_UUID)
-            _connection.value = if (status == BluetoothGatt.GATT_SUCCESS && liveMetrics != null && runState != null && mediaMetadata != null && notificationPayload != null && displayContext != null && deviceEvents != null) {
+            if (status == BluetoothGatt.GATT_SUCCESS && liveMetrics != null && runState != null && mediaMetadata != null && notificationPayload != null && displayContext != null && deviceEvents != null) {
                 _bridge.value = _bridge.value.copy(connected = true, lastError = null)
                 enableDeviceEventNotifications()
                 beginProtocolStream()
-                DeviceConnection.Ready(gatt.device.name ?: "RunDeck")
+                _connection.value = DeviceConnection.Ready(gatt.device.name ?: "RunDeck")
             } else {
                 _bridge.value = _bridge.value.copy(connected = false, streamingRun = false, lastError = "PROTOCOL NOT FOUND")
-                DeviceConnection.Error("RunDeck protocol service was not found")
+                // A stale GATT cache or a just-restarted display can complete
+                // the link before its service table is ready. Close it through
+                // the same bounded reconnect path used for link loss.
+                onDisconnected(gatt, "RunDeck protocol service was not found")
             }
         }
 
@@ -641,7 +644,8 @@ class RunDeckBleClient(context: Context) {
         if (reconnectEnabled && rememberedAddress != null && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
             val delayMs = 1_000L shl reconnectAttempts.coerceAtMost(3)
             reconnectAttempts += 1
-            _connection.value = DeviceConnection.Connecting("RunDeck (reconnecting)")
+            _connection.value = DeviceConnection.Connecting("RunDeck (retry $reconnectAttempts/$MAX_RECONNECT_ATTEMPTS)")
+            _bridge.value = _bridge.value.copy(lastError = "RECONNECTING")
             scheduleReconnect(delayMs)
         } else {
             _connection.value = DeviceConnection.Error(reason)
@@ -650,7 +654,10 @@ class RunDeckBleClient(context: Context) {
 
     private companion object {
         const val KEY_DEVICE_ADDRESS = "device_address"
-        const val MAX_RECONNECT_ATTEMPTS = 5
+        // Keep trying long enough to cover a display reboot, USB power cycle,
+        // or a temporary Android BLE stack reset without requiring the user to
+        // rediscover the saved RunDeck every time.
+        const val MAX_RECONNECT_ATTEMPTS = 12
         const val OP_RUN_STATE = "RUN STATE"
         const val OP_METRIC = "METRIC"
         const val OP_MEDIA = "MEDIA"
