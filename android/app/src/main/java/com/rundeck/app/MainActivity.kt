@@ -53,6 +53,8 @@ import com.rundeck.app.ble.RunDeckBleClient
 import com.rundeck.app.media.PhoneMediaController
 import com.rundeck.app.media.PhoneMediaState
 import com.rundeck.app.notifications.RunDeckNotificationBridge
+import com.rundeck.app.notifications.RunDeckNotificationSettings
+import com.rundeck.app.notifications.RunDeckNotificationPreferences
 import com.rundeck.app.run.RunSession
 import com.rundeck.app.run.RunTrackingService
 import com.rundeck.app.run.LongRunTarget
@@ -77,7 +79,9 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     val connection = bleClient.connection
     val bridge = bleClient.bridge
     val media = mediaController.state
+    val notifications = RunDeckNotificationPreferences.settings
     init {
+        RunDeckNotificationPreferences.initialize(application)
         mediaController.start()
         viewModelScope.launch {
             RunSession.state.collectLatest(bleClient::publishRunState)
@@ -109,6 +113,12 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     fun previousTrack() = mediaController.previous()
     fun playPause() = mediaController.playPause()
     fun nextTrack() = mediaController.next()
+    fun setNotificationForwarding(enabled: Boolean) =
+        RunDeckNotificationPreferences.setForwardingEnabled(getApplication(), enabled)
+    fun setNotificationAllowAll(allowAll: Boolean) =
+        RunDeckNotificationPreferences.setAllowAllMessageApps(getApplication(), allowAll)
+    fun setNotificationSourceAllowed(packageName: String, allowed: Boolean) =
+        RunDeckNotificationPreferences.setSourceAllowed(getApplication(), packageName, allowed)
     override fun onCleared() {
         mediaController.close()
         bleClient.close()
@@ -121,6 +131,7 @@ private fun RunDeckApp(viewModel: DeviceViewModel = viewModel()) {
     val connection by viewModel.connection.collectAsState()
     val bridge by viewModel.bridge.collectAsState()
     val media by viewModel.media.collectAsState()
+    val notifications by viewModel.notifications.collectAsState()
     val run by RunSession.state.collectAsState()
     var showRunSetup by remember { mutableStateOf(false) }
     var checkpoint by remember { mutableStateOf<com.rundeck.app.run.RunUiState?>(null) }
@@ -188,7 +199,7 @@ private fun RunDeckApp(viewModel: DeviceViewModel = viewModel()) {
                     onBack = { showRunSetup = false },
                 )
                 else -> DeviceSetupScreen(
-                    connection, devices, media, requestBluetooth,
+                    connection, devices, media, notifications, requestBluetooth,
                     onConnect = viewModel::connect,
                     onContinue = { showRunSetup = true },
                     onEnableMedia = {
@@ -198,6 +209,9 @@ private fun RunDeckApp(viewModel: DeviceViewModel = viewModel()) {
                     onPrevious = viewModel::previousTrack,
                     onPlayPause = viewModel::playPause,
                     onNext = viewModel::nextTrack,
+                    onNotificationForwarding = viewModel::setNotificationForwarding,
+                    onNotificationAllowAll = viewModel::setNotificationAllowAll,
+                    onNotificationSourceAllowed = viewModel::setNotificationSourceAllowed,
                 )
             }
         }
@@ -209,6 +223,7 @@ private fun DeviceSetupScreen(
     connection: DeviceConnection,
     devices: List<DiscoveredRunDeck>,
     media: PhoneMediaState,
+    notifications: RunDeckNotificationSettings,
     onScan: () -> Unit,
     onConnect: (DiscoveredRunDeck) -> Unit,
     onContinue: () -> Unit,
@@ -217,6 +232,9 @@ private fun DeviceSetupScreen(
     onPrevious: () -> Unit,
     onPlayPause: () -> Unit,
     onNext: () -> Unit,
+    onNotificationForwarding: (Boolean) -> Unit,
+    onNotificationAllowAll: (Boolean) -> Unit,
+    onNotificationSourceAllowed: (String, Boolean) -> Unit,
 ) = ScreenColumn {
     BrandHeader("DEVICE SETUP")
     Spacer(Modifier.height(14.dp))
@@ -230,9 +248,73 @@ private fun DeviceSetupScreen(
     else devices.forEach { device -> DeviceRow(device) { onConnect(device) } }
     Spacer(Modifier.height(22.dp))
     MediaCard(media, onEnableMedia, onRefreshMedia, onPrevious, onPlayPause, onNext)
+    Spacer(Modifier.height(14.dp))
+    NotificationCard(
+        notifications,
+        onEnableMedia,
+        onNotificationForwarding,
+        onNotificationAllowAll,
+        onNotificationSourceAllowed,
+    )
     if (connection is DeviceConnection.Ready) {
         Spacer(Modifier.weight(1f))
         PrimaryButton("CONTINUE TO RUN SETUP", onContinue)
+    }
+}
+
+@Composable
+private fun NotificationCard(
+    settings: RunDeckNotificationSettings,
+    onOpenAccess: () -> Unit,
+    onForwarding: (Boolean) -> Unit,
+    onAllowAll: (Boolean) -> Unit,
+    onSourceAllowed: (String, Boolean) -> Unit,
+) = Column(Modifier.fillMaxWidth().background(Color(0xFF080A0D), RoundedCornerShape(16.dp)).padding(18.dp)) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        Text("MESSAGES", color = Lime, fontSize = 13.sp, letterSpacing = 2.sp)
+        Text(if (settings.forwardingEnabled) "ON" else "PAUSED", color = if (settings.forwardingEnabled) Lime else Amber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+    }
+    Spacer(Modifier.height(8.dp))
+    Text("Choose which message apps can pop up on RunDeck.", color = Muted, fontSize = 13.sp)
+    Spacer(Modifier.height(12.dp))
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Button(onClick = { onForwarding(!settings.forwardingEnabled) }, colors = ButtonDefaults.buttonColors(containerColor = if (settings.forwardingEnabled) Color(0xFF451B1B) else Color(0xFF20390A), contentColor = White), modifier = Modifier.weight(1f).height(44.dp), shape = RoundedCornerShape(12.dp)) {
+            Text(if (settings.forwardingEnabled) "PAUSE" else "RESUME", fontWeight = FontWeight.Black)
+        }
+        Button(onClick = onOpenAccess, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF14232A), contentColor = White), modifier = Modifier.weight(1f).height(44.dp), shape = RoundedCornerShape(12.dp)) {
+            Text("ACCESS", fontWeight = FontWeight.Black)
+        }
+    }
+    Spacer(Modifier.height(10.dp))
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Button(onClick = { onAllowAll(true) }, colors = ButtonDefaults.buttonColors(containerColor = if (settings.allowAllMessageApps) Lime else Color(0xFF14232A), contentColor = if (settings.allowAllMessageApps) Black else White), modifier = Modifier.weight(1f).height(44.dp), shape = RoundedCornerShape(12.dp)) {
+            Text("ALL APPS", fontWeight = FontWeight.Black)
+        }
+        Button(onClick = { onAllowAll(false) }, colors = ButtonDefaults.buttonColors(containerColor = if (!settings.allowAllMessageApps) Lime else Color(0xFF14232A), contentColor = if (!settings.allowAllMessageApps) Black else White), modifier = Modifier.weight(1f).height(44.dp), shape = RoundedCornerShape(12.dp)) {
+            Text("SELECTED", fontWeight = FontWeight.Black)
+        }
+    }
+    if (!settings.allowAllMessageApps) {
+        Spacer(Modifier.height(12.dp))
+        if (settings.sources.isEmpty()) {
+            Text("No message apps detected yet. Send one test text, then return here to pick the source.", color = Amber, fontSize = 12.sp)
+        } else {
+            settings.sources.forEach { source ->
+                Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                    Column(Modifier.weight(1f)) {
+                        Text(source.label, color = White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text(source.packageName, color = Muted, fontSize = 11.sp)
+                    }
+                    Button(onClick = { onSourceAllowed(source.packageName, !source.allowed) }, colors = ButtonDefaults.buttonColors(containerColor = if (source.allowed) Lime else Color(0xFF14232A), contentColor = if (source.allowed) Black else White), modifier = Modifier.height(38.dp), shape = RoundedCornerShape(10.dp)) {
+                        Text(if (source.allowed) "ON" else "OFF", fontWeight = FontWeight.Black)
+                    }
+                }
+            }
+            if (settings.selectedCount == 0) {
+                Spacer(Modifier.height(6.dp))
+                Text("Selected-only mode has no sources enabled, so message overlays are effectively muted.", color = Amber, fontSize = 12.sp)
+            }
+        }
     }
 }
 

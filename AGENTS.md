@@ -146,8 +146,10 @@ planned work.
   suppresses exact duplicates for 90 seconds, queues bundled messages to the
   device with a short visible gap, and writes an unfragmented CBOR packet on
   `0004`. Firmware shows a 12-second modal overlay on any page and supports
-  local swipe-down dismiss. Full allowlist UI, Android dismissal ack, and
-  fragmentation are not complete.
+  local swipe-down dismiss. Android has a first app-level allowlist UI with
+  forwarding on/off, all-message-apps mode, selected-sources mode, and local
+  persistence for observed/common message apps. Contact allowlisting, Android
+  dismissal ack, and fragmentation are not complete.
 - For the Long Run target, Android owns the 8:50–9:20 /mi rule. Do not hardcode
   a competing target on the display. Firmware currently renders the target and
   status flags sent by Android.

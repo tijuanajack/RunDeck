@@ -124,9 +124,14 @@ Last verified: 2026-07-30.
   gap. Android sends an unfragmented CBOR notification payload on characteristic
   `0004`. Firmware validates/stores that packet, shows a 12-second modal
   overlay on any RunDeck screen, and supports local swipe-down dismissal.
-  Android tests/build passed and APK install/launch passed on 2026-07-30. Full
-  app/contact allowlist UI, Android-side dismissal acknowledgements, and
-  fragmented long notifications remain future work.
+  Android tests/build passed and APK install/launch passed on 2026-07-30.
+- Notification allowlist checkpoint: Android now has a first app-level message
+  allowlist card on Device Setup with forwarding on/off, all-message-apps mode,
+  selected-sources mode, source discovery for common installed message apps and
+  observed notification packages, and local persistence. Android tests/build
+  passed on 2026-07-31, but APK install/launch is pending because ADB did not
+  see the phone at handoff. Contact-level allowlisting, Android-side dismissal
+  acknowledgements, and fragmented long notifications remain future work.
 - The selected V1 Long Run target is 8:50–9:20 /mi. Android derives
   `ON TARGET`, `EASE OFF`, `PICK IT UP`, or `GPS WEAK` and sends that state to
   the display. Active-run distance, elapsed time, and pace are checkpointed

@@ -34,6 +34,7 @@ object RunDeckNotificationBridge {
 
         val candidates = bundledMessageCandidates(sbn).ifEmpty { listOfNotNull(summaryCandidate(sbn)) }
         val app = appLabel(context, sbn.packageName).sanitize(16).ifBlank { "MESSAGE" }
+        if (!RunDeckNotificationPreferences.isPackageAllowed(context, sbn.packageName, app)) return
 
         candidates.forEach { candidate ->
             if (candidate.title.isBlank() || candidate.body.isBlank()) return@forEach
