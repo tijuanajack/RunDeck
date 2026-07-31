@@ -99,6 +99,7 @@ class RunDeckBleClient(context: Context) {
     private var streamingDemoMetrics = false
     private var protocolStarted = false
     private var settingsAckPending = false
+    private var displayBrightness = 208
     private var currentRunState: RunUiState? = null
     private var hrOwnershipMode = HrOwnershipMode.PhoneForwardedHr
     private var currentPreset: RunPreset = RunPresetCatalog.longRun
@@ -538,10 +539,15 @@ class RunDeckBleClient(context: Context) {
         settingsAckPending = true
         queueWrite(
             characteristic,
-            RunDeckProtocol.encodeProtocolSettings(sequence.getAndIncrement() and 0xFFFF),
+            RunDeckProtocol.encodeProtocolSettings(sequence.getAndIncrement() and 0xFFFF, displayBrightness),
             BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT,
             OP_SETTINGS,
         )
+    }
+
+    fun setDisplayBrightness(level: Int) {
+        displayBrightness = level.coerceIn(16, 255)
+        if (protocolStarted) sendProtocolSettings()
     }
 
     private fun startHeartbeat() {

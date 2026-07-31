@@ -1,4 +1,5 @@
 #include "rundeck_ble.h"
+#include "../board/waveshare_board.h"
 
 #include <Arduino.h>
 #include <NimBLEDevice.h>
@@ -364,13 +365,14 @@ bool decodeDisplayContext(const uint8_t* input, size_t size, DisplayContextConfi
   return true;
 }
 
-bool decodeProtocolSettings(const uint8_t* input, size_t size, uint16_t* sequence) {
+bool decodeProtocolSettings(const uint8_t* input, size_t size, uint16_t* sequence, uint8_t* brightnessOut) {
   if (size == 0 || size > kDisplayContextMaxBytes) return false;
   CborReader reader(input, size);
   uint8_t entries = 0;
-  if (!reader.readMap(&entries) || entries != 4) return false;
+  if (!reader.readMap(&entries) || (entries != 4 && entries != 5)) return false;
   uint32_t version = 0, decodedSequence = 0, maxFragment = 0, maxNotification = 0;
-  bool seenVersion = false, seenSequence = false, seenFragment = false, seenNotification = false;
+  bool seenVersion = false, seenSequence = false, seenFragment = false, seenNotification = false, seenBrightness = false;
+  uint32_t brightness = 208;
   for (uint8_t i = 0; i < entries; ++i) {
     uint32_t key = 0;
     if (!reader.readUInt(&key)) return false;
@@ -379,13 +381,15 @@ bool decodeProtocolSettings(const uint8_t* input, size_t size, uint16_t* sequenc
       case 1: seenSequence = reader.readUInt(&decodedSequence); break;
       case 2: seenFragment = reader.readUInt(&maxFragment); break;
       case 3: seenNotification = reader.readUInt(&maxNotification); break;
+      case 4: seenBrightness = reader.readUInt(&brightness); break;
       default: return false;
     }
   }
-  if (!reader.done() || !seenVersion || !seenSequence || !seenFragment || !seenNotification) return false;
+  if (!reader.done() || !seenVersion || !seenSequence || !seenFragment || !seenNotification || (entries == 5 && !seenBrightness)) return false;
   if (version != kProtocolVersion || decodedSequence > 0xFFFF || maxFragment != kNotificationFragmentMaxBytes ||
-      maxNotification != kNotificationMaxBytes) return false;
+      maxNotification != kNotificationMaxBytes || brightness < 16 || brightness > 255) return false;
   *sequence = static_cast<uint16_t>(decodedSequence);
+  *brightnessOut = static_cast<uint8_t>(brightness);
   return true;
 }
 
@@ -613,9 +617,10 @@ class SettingsCallbacks : public NimBLECharacteristicCallbacks {
   void onWrite(NimBLECharacteristic* characteristic, NimBLEConnInfo&) override {
     const std::string value = characteristic->getValue();
     const auto* input = reinterpret_cast<const uint8_t*>(value.data());
-    if (!value.empty() && input[0] == 0xA4) {
+    if (!value.empty() && input[0] == 0xA5) {
       uint16_t sequence = 0;
-      if (!decodeProtocolSettings(input, value.size(), &sequence)) return;
+      uint8_t brightness = 208;
+      if (!decodeProtocolSettings(input, value.size(), &sequence, &brightness)) return;
       portENTER_CRITICAL(&metricsMux);
       const bool replayed = haveSettingsSequence && static_cast<int16_t>(sequence - lastSettingsSequence) <= 0;
       bool accepted = false;
@@ -627,6 +632,7 @@ class SettingsCallbacks : public NimBLECharacteristicCallbacks {
         accepted = true;
       }
       portEXIT_CRITICAL(&metricsMux);
+      if (accepted) setDisplayBrightness(brightness);
       if (accepted) notifyAck(sequence, kCommandSettings, kAckOk);
       return;
     }

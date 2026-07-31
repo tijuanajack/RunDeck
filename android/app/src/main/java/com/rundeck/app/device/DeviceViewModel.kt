@@ -49,6 +49,9 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     private val weatherProvider = OpenMeteoWeather()
     private val heartRateClient = HeartRateClient(application)
     private var weatherCoordinates: Pair<Double, Double>? = null
+    private val displayBrightnessPrefs = application.getSharedPreferences("rundeck_display", 0)
+    private val _displayBrightness = MutableStateFlow(displayBrightnessPrefs.getInt("brightness", 208).coerceIn(16, 255))
+    val displayBrightness: StateFlow<Int> = _displayBrightness
     private val _weatherLocationStatus = MutableStateFlow("NOT SET")
     val weatherLocationStatus: StateFlow<String> = _weatherLocationStatus
 
@@ -66,6 +69,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
         RunDeckNotificationPreferences.initialize(application)
         HrOwnershipPreferences.initialize(application)
         RunPresetPreferences.initialize(application)
+        bleClient.setDisplayBrightness(_displayBrightness.value)
         mediaController.start()
         viewModelScope.launch {
             RunSession.state.collectLatest(bleClient::publishRunState)
@@ -169,6 +173,12 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
         RunDeckNotificationPreferences.setContactAllowed(getApplication(), packageName, sender, allowed)
     fun setHrOwnershipMode(mode: HrOwnershipMode) = HrOwnershipPreferences.set(getApplication(), mode)
     fun setPreset(preset: RunPreset) = RunPresetPreferences.set(getApplication(), preset)
+    fun setDisplayBrightness(level: Int) {
+        val safe = level.coerceIn(16, 255)
+        displayBrightnessPrefs.edit().putInt("brightness", safe).apply()
+        _displayBrightness.value = safe
+        bleClient.setDisplayBrightness(safe)
+    }
     @Suppress("MissingPermission")
     fun seedWeatherFromLastKnownLocation() {
         val context = getApplication<Application>()

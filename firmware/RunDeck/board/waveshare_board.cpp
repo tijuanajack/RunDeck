@@ -37,6 +37,7 @@ constexpr uint8_t kExpanderOutputMask =
     kExpanderOledResetBit | kExpanderTouchResetBit | kExpanderGpio5Bit;
 
 esp_lcd_touch_handle_t touch = nullptr;
+esp_lcd_panel_io_handle_t panelIo = nullptr;
 lv_disp_draw_buf_t drawBuffer;
 lv_disp_drv_t displayDriver;
 uint8_t expanderState = 0x00;
@@ -141,6 +142,7 @@ bool beginWaveshareBoard() {
   const esp_lcd_panel_io_spi_config_t ioConfig = SH8601_PANEL_IO_QSPI_CONFIG(kCs, flushReady, &displayDriver);
   esp_lcd_panel_io_handle_t io = nullptr;
   if (esp_lcd_new_panel_io_spi((esp_lcd_spi_bus_handle_t)SPI2_HOST, &ioConfig, &io) != ESP_OK) return false;
+  panelIo = io;
   const sh8601_vendor_config_t vendor = {kInit, sizeof(kInit) / sizeof(kInit[0]), {.use_qspi_interface = 1}};
   if (!pulseExpanderReset(kExpanderOledResetBit)) {
     Serial.println("RunDeck OLED reset failed");
@@ -190,6 +192,12 @@ bool beginWaveshareBoard() {
   const esp_timer_create_args_t timerArgs = {.callback = tick, .name = "rundeck_lvgl"};
   esp_timer_handle_t timer = nullptr;
   return esp_timer_create(&timerArgs, &timer) == ESP_OK && esp_timer_start_periodic(timer, 2000) == ESP_OK;
+}
+
+bool setDisplayBrightness(uint8_t level) {
+  if (!panelIo) return false;
+  const uint8_t value = level;
+  return esp_lcd_panel_io_tx_param(panelIo, 0x51, &value, 1) == ESP_OK;
 }
 
 }  // namespace rundeck

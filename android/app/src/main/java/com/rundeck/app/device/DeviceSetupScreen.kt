@@ -72,6 +72,8 @@ fun DeviceSetupScreen(
     onAllowBackgroundRuns: () -> Unit,
     weatherLocationStatus: String,
     onUseWeatherLocation: () -> Unit,
+    displayBrightness: Int,
+    onDisplayBrightness: (Int) -> Unit,
 ) = Column(
     Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 42.dp),
 ) {
@@ -94,6 +96,8 @@ fun DeviceSetupScreen(
     Spacer(Modifier.height(14.dp))
     WeatherLocationCard(weatherLocationStatus, onUseWeatherLocation)
     Spacer(Modifier.height(14.dp))
+    BrightnessCard(displayBrightness, onDisplayBrightness)
+    Spacer(Modifier.height(14.dp))
     HrModeCard(hrOwnership, onHrOwnershipMode)
     Spacer(Modifier.height(14.dp))
     HeartRateCard(heartRate, heartRateDevices, onScanHeartRate, onConnectHeartRate)
@@ -115,6 +119,28 @@ private fun WeatherLocationCard(status: String, onUseLocation: () -> Unit) = Col
     androidx.compose.material3.Text("Use the phone's recent location so temperature is available before a run starts.", color = Muted, fontSize = 13.sp)
     Spacer(Modifier.height(12.dp))
     PrimaryButton("USE PHONE LOCATION", onUseLocation)
+}
+
+@Composable
+private fun BrightnessCard(level: Int, onBrightness: (Int) -> Unit) = Column(
+    Modifier.fillMaxWidth().background(Color(0xFF080A0D), RoundedCornerShape(16.dp)).padding(18.dp),
+) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        androidx.compose.material3.Text("DISPLAY BRIGHTNESS", color = Cyan, fontSize = 13.sp, letterSpacing = 2.sp)
+        androidx.compose.material3.Text("${(level * 100 / 255)}%", color = Lime, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+    }
+    Spacer(Modifier.height(8.dp))
+    androidx.compose.material3.Text("Adjust AMOLED brightness without changing boot, wake, or touch-lock behavior.", color = Muted, fontSize = 13.sp)
+    Spacer(Modifier.height(12.dp))
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        listOf("NIGHT" to 48, "NORMAL" to 144, "BRIGHT" to 208, "MAX" to 255).forEach { (label, value) ->
+            Button(
+                onClick = { onBrightness(value) },
+                colors = ButtonDefaults.buttonColors(containerColor = if (level == value) Lime else Color(0xFF14232A), contentColor = if (level == value) Black else White),
+                modifier = Modifier.weight(1f).height(42.dp), shape = RoundedCornerShape(10.dp),
+            ) { androidx.compose.material3.Text(label, fontWeight = FontWeight.Black, fontSize = 10.sp) }
+        }
+    }
 }
 
 @Composable

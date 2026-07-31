@@ -262,6 +262,10 @@ Last verified: 2026-07-30.
   fragmentation is complete, and the `0006` settings handshake now validates
   and acknowledges the negotiated fragment/notification limits before context
   updates.
+- Display brightness checkpoint: Android now persists NIGHT, NORMAL, BRIGHT,
+  or MAX brightness and sends the selected level through the acknowledged
+  settings packet. Firmware applies it through the SH8601 `0x51` command only
+  after the verified panel initialization path completes.
 - Heart rate remains optional. Live phone-GPS runs display the Garmin strap as
   off/unavailable until an actual HR source is connected. Garmin HRM-Dual
   direct mode, concurrent central/peripheral soak testing, and a real

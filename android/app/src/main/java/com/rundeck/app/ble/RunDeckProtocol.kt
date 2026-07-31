@@ -77,6 +77,7 @@ object RunDeckProtocol {
     private const val SETTINGS_KEY_SEQUENCE = 1
     private const val SETTINGS_KEY_MAX_FRAGMENT_BYTES = 2
     private const val SETTINGS_KEY_MAX_NOTIFICATION_BYTES = 3
+    private const val SETTINGS_KEY_BRIGHTNESS = 4
 
     fun encodeLiveMetrics(sequence: Int, sourceMonotonicMs: Long, metrics: LiveMetrics): ByteArray {
         require(sequence in 0..0xFFFF)
@@ -327,14 +328,16 @@ object RunDeckProtocol {
     }
 
     /** Negotiates the bounded binary limits used by the v1 notification path. */
-    fun encodeProtocolSettings(sequence: Int): ByteArray {
+    fun encodeProtocolSettings(sequence: Int, brightness: Int = 208): ByteArray {
         require(sequence in 0..0xFFFF)
+        require(brightness in 16..255)
         val output = ByteArrayOutputStream()
-        output.write(0xA4)
+        output.write(0xA5)
         output.writeUintEntry(SETTINGS_KEY_VERSION, VERSION.toInt())
         output.writeUintEntry(SETTINGS_KEY_SEQUENCE, sequence)
         output.writeUintEntry(SETTINGS_KEY_MAX_FRAGMENT_BYTES, NOTIFICATION_FRAGMENT_MAX_BYTES)
         output.writeUintEntry(SETTINGS_KEY_MAX_NOTIFICATION_BYTES, MAX_NOTIFICATION_BYTES)
+        output.writeUintEntry(SETTINGS_KEY_BRIGHTNESS, brightness)
         return output.toByteArray().also { require(it.size <= MAX_DISPLAY_CONTEXT_BYTES) }
     }
 
