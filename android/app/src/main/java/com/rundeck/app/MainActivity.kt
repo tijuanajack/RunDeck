@@ -86,6 +86,7 @@ private fun RunDeckApp(viewModel: DeviceViewModel = viewModel()) {
     val selectedPreset by viewModel.selectedPreset.collectAsState()
     val heartRateDevices by viewModel.heartRateDevices.collectAsState()
     val heartRate by viewModel.heartRate.collectAsState()
+    val weatherLocationStatus by viewModel.weatherLocationStatus.collectAsState()
     val run by RunSession.state.collectAsState()
     var showRunSetup by remember { mutableStateOf(false) }
     var checkpoint by remember { mutableStateOf<com.rundeck.app.run.RunUiState?>(null) }
@@ -217,6 +218,7 @@ private fun RunDeckApp(viewModel: DeviceViewModel = viewModel()) {
                             )
                         }
                     },
+                    weatherLocationStatus = weatherLocationStatus,
                     onUseWeatherLocation = requestWeatherLocation,
                 )
             }

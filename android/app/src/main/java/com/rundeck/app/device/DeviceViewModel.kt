@@ -29,6 +29,8 @@ import com.rundeck.app.hr.HeartRateClient
 import com.rundeck.app.hr.HeartRateDevice
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.time.LocalTime
@@ -47,6 +49,8 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     private val weatherProvider = OpenMeteoWeather()
     private val heartRateClient = HeartRateClient(application)
     private var weatherCoordinates: Pair<Double, Double>? = null
+    private val _weatherLocationStatus = MutableStateFlow("NOT SET")
+    val weatherLocationStatus: StateFlow<String> = _weatherLocationStatus
 
     val devices = bleClient.devices
     val connection = bleClient.connection
@@ -169,12 +173,22 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     fun seedWeatherFromLastKnownLocation() {
         val context = getApplication<Application>()
         if (context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
-            context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
-        val manager = context.getSystemService(LocationManager::class.java) ?: return
+            context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            _weatherLocationStatus.value = "LOCATION PERMISSION NEEDED"
+            return
+        }
+        val manager = context.getSystemService(LocationManager::class.java) ?: run {
+            _weatherLocationStatus.value = "LOCATION UNAVAILABLE"
+            return
+        }
         val location = manager.allProviders.asSequence()
             .mapNotNull { provider -> runCatching { manager.getLastKnownLocation(provider) }.getOrNull() }
-            .maxByOrNull { it.time } ?: return
+            .maxByOrNull { it.time } ?: run {
+                _weatherLocationStatus.value = "NO RECENT FIX"
+                return
+            }
         weatherCoordinates = location.latitude to location.longitude
+        _weatherLocationStatus.value = "LOCATION READY"
     }
     fun scanHeartRate() = heartRateClient.scan()
     fun connectHeartRate(device: HeartRateDevice) = heartRateClient.connect(device)

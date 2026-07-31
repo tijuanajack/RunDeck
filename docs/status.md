@@ -270,7 +270,9 @@ Last verified: 2026-07-30.
 - Brightness/power work and
   real-run outdoor validation remain future work. Setup now offers a
   permission-gated recent-phone-location weather seed; the provider still
-  refreshes at most every ten minutes and marks stale results. App-level message-source
+  refreshes at most every ten minutes and marks stale results. The setup card
+  reports whether permission is already granted, a recent fix is available, or
+  a fresh fix is needed. App-level message-source
   selection and 90-second duplicate suppression are implemented.
 - The scripted flash helper deliberately refuses to choose between multiple
   serial ports. When the phone is also attached, identify the Espressif USB
