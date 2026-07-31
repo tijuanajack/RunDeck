@@ -437,10 +437,13 @@ void RunDeckBle::applyMediaState(DisplayState* state, uint32_t nowMs) {
   state->media = {fresh ? (available ? SourceState::Connected : SourceState::Unavailable)
                         : SourceState::Stale,
                   receivedAt};
-  state->mediaPlaying = fresh && available && playing;
-  state->mediaSource = fresh ? source : "PHONE";
-  state->mediaTitle = fresh ? (available ? title : "NO MEDIA") : "MEDIA STALE";
-  state->mediaArtist = fresh ? artist : "";
+  // MediaSession metadata is event-driven: many players do not re-send title
+  // and artist while a song continues. Keep the last known metadata visible
+  // even if the source timestamp is stale; only the source state ages.
+  state->mediaPlaying = available && playing;
+  state->mediaSource = source;
+  state->mediaTitle = available ? title : "NO MEDIA";
+  state->mediaArtist = artist;
 }
 
 void RunDeckBle::notifyMediaControl(MediaControlAction action) {

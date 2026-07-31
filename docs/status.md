@@ -110,6 +110,11 @@ Last verified: 2026-07-30.
   install/launch passed, and firmware compile/flash to `/dev/ttyACM0` were
   hash-verified on 2026-07-30. User still needs to confirm taps on the RunDeck
   screen control the phone.
+- Music display polish: long song titles now use LVGL circular horizontal
+  scrolling instead of dot truncation, and the firmware keeps the last known
+  title/artist visible when MediaSession metadata ages instead of replacing it
+  with `MEDIA STALE`. Firmware compile and flash to `/dev/ttyACM0` were
+  hash-verified on 2026-07-30.
 - The selected V1 Long Run target is 8:50–9:20 /mi. Android derives
   `ON TARGET`, `EASE OFF`, `PICK IT UP`, or `GPS WEAK` and sends that state to
   the display. Active-run distance, elapsed time, and pace are checkpointed

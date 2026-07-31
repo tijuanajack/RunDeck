@@ -129,7 +129,9 @@ planned work.
   control events over characteristic `0005`; user confirmation is still needed.
   Keep display-bound media strings backed by persistent storage, not local
   decoded packet copies; the temporary-copy bug caused random characters under
-  the song title.
+  the song title. Long Music-screen titles use LVGL circular scrolling, and
+  stale MediaSession timestamps should not replace known title/artist text with
+  `MEDIA STALE`.
 - Device-event `0005` currently exposes run-state ACK as an 8-byte compact
   event and device-origin media controls as 8-byte notify events. Android reads
   `0005` after the run-state write completes and shows `PRESET ACCEPTED`;

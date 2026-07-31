@@ -2,6 +2,7 @@
 
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
 
 namespace rundeck {
 namespace {
@@ -190,7 +191,8 @@ void Dashboard::buildMusic() {
   mediaSource_ = label(content_, &lv_font_montserrat_20, LV_ALIGN_TOP_LEFT, 40, 110, kCyan);
   mediaTrack_ = label(content_, &lv_font_montserrat_48, LV_ALIGN_TOP_LEFT, 36, 144);
   lv_obj_set_width(mediaTrack_, 520);
-  lv_label_set_long_mode(mediaTrack_, LV_LABEL_LONG_DOT);
+  lv_label_set_long_mode(mediaTrack_, LV_LABEL_LONG_SCROLL_CIRCULAR);
+  lv_obj_set_style_anim_speed(mediaTrack_, 35, 0);
   mediaArtist_ = label(content_, &lv_font_montserrat_20, LV_ALIGN_TOP_LEFT, 40, 206, kMuted);
   lv_obj_set_width(mediaArtist_, 520);
   lv_label_set_long_mode(mediaArtist_, LV_LABEL_LONG_DOT);
@@ -277,9 +279,9 @@ void Dashboard::updateDashboard() {
   const char* artist = state_.mediaArtist ? state_.mediaArtist : "";
   char value[96];
   if (page_ == Screen::Music && mediaTrack_) {
-    lv_label_set_text(mediaSource_, source);
-    lv_label_set_text(mediaTrack_, title);
-    lv_label_set_text(mediaArtist_, artist);
+    if (strcmp(lv_label_get_text(mediaSource_), source) != 0) lv_label_set_text(mediaSource_, source);
+    if (strcmp(lv_label_get_text(mediaTrack_), title) != 0) lv_label_set_text(mediaTrack_, title);
+    if (strcmp(lv_label_get_text(mediaArtist_), artist) != 0) lv_label_set_text(mediaArtist_, artist);
     lv_label_set_text(mediaPlayButton_, state_.mediaPlaying ? "PAUSE" : "PLAY");
     char hrValue[12];
     if (state_.heartRateBpm) snprintf(hrValue, sizeof(hrValue), "%u BPM", state_.heartRateBpm);
