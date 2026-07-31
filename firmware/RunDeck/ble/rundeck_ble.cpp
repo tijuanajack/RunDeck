@@ -742,4 +742,12 @@ bool RunDeckBle::applyLiveMetrics(DisplayState* state, uint32_t nowMs) {
   return true;
 }
 
+bool RunDeckBle::phoneSessionSeen() const {
+  bool seen = false;
+  portENTER_CRITICAL(&metricsMux);
+  seen = haveMetrics || haveRunState || haveMedia || haveNotification || haveDisplayContext;
+  portEXIT_CRITICAL(&metricsMux);
+  return seen;
+}
+
 }  // namespace rundeck

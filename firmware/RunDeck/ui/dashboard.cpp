@@ -85,6 +85,12 @@ void Dashboard::begin() {
   buildSplash();
 }
 
+void Dashboard::onPhoneConnected() {
+  if (!splashVisible_) return;
+  splashVisible_ = false;
+  show(Screen::Dashboard);
+}
+
 void Dashboard::onGesture(lv_event_t* event) {
   auto* self = static_cast<Dashboard*>(lv_event_get_user_data(event));
   lv_indev_t* input = lv_indev_get_act();

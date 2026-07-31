@@ -93,6 +93,10 @@ void loop() {
     ble.applyDisplayContext(&state, now);
     ble.applyBatteryState(&state, now);
     ble.applyNotificationState(&state, now);
+    // The phone sends run-state/media/context during protocol setup even
+    // before a run starts. That is enough to leave the branded boot screen;
+    // live metrics are still freshness-gated independently below.
+    if (ble.phoneSessionSeen()) dashboard.onPhoneConnected();
     dashboard.render(state);
     Serial.printf("pace=%.2f hr=%u status=%s\n", state.paceMinutesPerMile,
                   state.heartRateBpm, state.statusText);

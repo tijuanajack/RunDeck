@@ -29,6 +29,8 @@ class RunDeckBle {
   void notifyNotificationDismissed(uint16_t notificationSequence);
   /** Returns true only when a fresh Android metrics frame was applied. */
   bool applyLiveMetrics(DisplayState* state, uint32_t nowMs);
+  /** Returns true after any accepted phone protocol packet has arrived. */
+  bool phoneSessionSeen() const;
 };
 
 }  // namespace rundeck

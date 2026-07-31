@@ -12,6 +12,7 @@ enum class RunControlAction : uint8_t { Pause = 4, Resume = 5, Stop = 6 };
 class Dashboard {
  public:
   void begin();
+  void onPhoneConnected();
   void render(const DisplayState& state);
   void setMediaControlHandler(void (*handler)(MediaControlAction, void*), void* context);
   void setRunControlHandler(void (*handler)(RunControlAction, void*), void* context);
