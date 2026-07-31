@@ -151,6 +151,8 @@ Last verified: 2026-07-30.
   2026-07-31.
   The boot transition also accepts the initial run-state/media/context packet,
   so the splash exits when the phone connects even before a run begins.
+  The unconnected splash now includes a compact `CONNECT TO RUNDECK APP`
+  instruction beneath the artwork.
 - Notification end-to-end verification: the user confirmed a new test message
   appeared on RunDeck after selecting the message source. The phone listener,
   allowlist, BLE notification write, and device overlay are working together.

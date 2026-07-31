@@ -237,6 +237,8 @@ void Dashboard::buildSplash() {
   // 600x450 panel, leaving a clean black margin around the supplied mark.
   lv_img_set_zoom(image, 512);
   lv_obj_center(image);
+  lv_obj_t* hint = label(content_, &lv_font_montserrat_16, LV_ALIGN_BOTTOM_MID, 0, -12, kCyan);
+  lv_label_set_text(hint, "CONNECT TO RUNDECK APP");
 }
 
 void Dashboard::buildDashboard() {
