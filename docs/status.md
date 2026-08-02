@@ -2,6 +2,9 @@
 
 Last verified: 2026-07-31.
 
+For a reusable handoff of the hardware, Android, BLE, recovery, and failure
+lessons behind this status, see [lessons learned](lessons-learned.md).
+
 ## Current hardware gate
 
 - The factory recovery image is preserved and cold-boots correctly with a

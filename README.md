@@ -29,6 +29,9 @@ RunDeck renders the fresh state over BLE. The device boots through the branded
 waiting screen, lands on Ready, starts from either phone or RunDeck, shows the
 live Dashboard, and returns to Ready after stop. See
 [implementation status](docs/status.md) for verified behavior and future work.
+For a reusable integration handoff covering hardware, Android lifecycle, BLE,
+recovery, and the known failure modes, see
+[lessons learned](docs/lessons-learned.md).
 
 ## Git workflow
 
